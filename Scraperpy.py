@@ -1,8 +1,11 @@
 """Fetch WUSA offers and print their details to the terminal."""
 
 import argparse
+import ast
 import os
 from pathlib import Path
+import re
+import shlex
 import sys
 from urllib.parse import urljoin, urlparse
 
@@ -10,6 +13,80 @@ import requests
 from bs4 import BeautifulSoup
 
 OFFERS_URL = "https://member.wusa.ca/your_offers"
+OFFERS_API_URL = "https://member.wusa.ca/api/member_offers/your_offers"
+PROJECT_DIR = Path(__file__).resolve().parent
+
+
+def clean_headers(headers):
+    """Let requests supply transport headers and request fresh HTML."""
+    ignored = {"host", "content-length", "accept-encoding", "if-none-match", "if-modified-since"}
+    return requests.structures.CaseInsensitiveDict(
+        (name, value) for name, value in headers.items()
+        if name.lower() not in ignored and not name.startswith(":")
+    )
+
+
+def load_python_request(path):
+    """Read curl.trillworks headers/cookies as literal data, without executing code."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+    except SyntaxError as exc:
+        raise ValueError("The request file must contain valid Python from curl.trillworks.") from exc
+    data = {"headers": {}, "cookies": {}}
+    for statement in tree.body:
+        if not isinstance(statement, ast.Assign):
+            continue
+        for target in statement.targets:
+            if not isinstance(target, ast.Name) or target.id not in data:
+                continue
+            try:
+                value = ast.literal_eval(statement.value)
+            except (ValueError, TypeError, SyntaxError) as exc:
+                raise ValueError(f"{target.id} must be a literal Python dictionary.") from exc
+            if not isinstance(value, dict) or not all(
+                isinstance(key, str) and isinstance(item, str)
+                and "\n" not in key + item and "\r" not in key + item
+                for key, item in value.items()
+            ):
+                raise ValueError(f"{target.id} must contain string names and values without newlines.")
+            data[target.id] = value
+    return clean_headers(data["headers"]), data["cookies"]
+
+
+def load_curl_request(path):
+    """Read headers from 'Copy as cURL (bash)'; never run the command."""
+    command = re.sub(r"\\\r?\n", " ", path.read_text(encoding="utf-8-sig"))
+    tokens = shlex.split(command)
+    if not tokens or tokens[0] not in {"curl", "curl.exe"}:
+        raise ValueError("The cURL file must start with curl. Use Copy as cURL (bash).")
+    headers = {}
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        option, separator, attached = token.partition("=")
+        if option in {"-H", "--header", "-b", "--cookie", "-X", "--request"}:
+            if separator:
+                value = attached
+            else:
+                index += 1
+                if index >= len(tokens):
+                    raise ValueError("A cURL header, cookie, or method is missing its value.")
+                value = tokens[index]
+            if option in {"-H", "--header"}:
+                name, colon, content = value.partition(":")
+                if not colon or not name.strip() or "\n" in value or "\r" in value:
+                    raise ValueError("Invalid cURL header. Copy the offers GET request again.")
+                headers[name.strip()] = content.strip()
+            elif option in {"-b", "--cookie"}:
+                if "=" not in value or "\n" in value or "\r" in value:
+                    raise ValueError("Use literal cookies from your copied browser request.")
+                headers["Cookie"] = value
+            elif value.upper() != "GET":
+                raise ValueError("Copy the GET request for the offers page.")
+        elif option.startswith("--data") or option in {"-d", "-F", "--form", "-I", "--head"}:
+            raise ValueError("Copy the GET request for the offers page.")
+        index += 1
+    return clean_headers(headers), {}
 
 
 def check_login(html, url=OFFERS_URL):
@@ -18,8 +95,9 @@ def check_login(html, url=OFFERS_URL):
         'a[href="/users/auth/saml"], form[action="/users/sign_in"]'
     ):
         raise ValueError(
-            "WUSA requires sign-in. Run python Scraperpy.py --login and sign in "
-            "in the browser, or set WUSA_COOKIE to your existing session cookie."
+            "WUSA did not accept the session cookies (they may have expired). "
+            "Copy a fresh authenticated offers request into request.py or request.curl "
+            "and run the scraper again."
         )
 
 
@@ -83,50 +161,63 @@ def parse_offers(html, selector=None):
     return offers
 
 
-def get_offers(cookie=None, selector=None):
-    headers = {"User-Agent": "Mozilla/5.0"}
+def parse_api_offers(data):
+    """Normalize the JSON used by WUSA's JavaScript offers page."""
+    if not isinstance(data, dict) or data.get("success") is not True:
+        message = data.get("message") if isinstance(data, dict) else None
+        raise ValueError(message or "WUSA could not load offers. Check your session cookies.")
+    groups = [data.get("featured_offers", []), data.get("offers", [])]
+    if not all(isinstance(group, list) for group in groups):
+        raise ValueError("WUSA returned an unexpected offers format.")
+    offers = []
+    seen = set()
+    for group in groups:
+        for record in group:
+            if not isinstance(record, dict) or not isinstance(record.get("title"), str):
+                raise ValueError("WUSA returned an unexpected offer format.")
+            key = record.get("id") if record.get("id") is not None else record["title"]
+            if key in seen:
+                continue
+            seen.add(key)
+            description = BeautifulSoup(record.get("description") or "", "html.parser")
+            details = [line.strip() for line in description.get_text("\n", strip=True).splitlines() if line.strip()]
+            if record.get("category_name"):
+                details.append(f"Category: {record['category_name']}")
+            if record.get("expiration_date"):
+                details.append(f"Expires: {record['expiration_date']}")
+            if "claimed" in record:
+                details.append(f"Claimed: {'Yes' if record['claimed'] else 'No'}")
+            urls = [record.get("document_url")] + [a.get("href") for a in description.select("a[href]")]
+            links = list(dict.fromkeys(
+                urljoin(OFFERS_URL, url) for url in urls
+                if isinstance(url, str) and url and urlparse(urljoin(OFFERS_URL, url)).scheme in {"http", "https"}
+            ))
+            offers.append({"title": record["title"], "details": details, "links": links})
+    return offers
+
+
+def get_offers(cookie=None, selector=None, headers=None, cookies=None):
+    headers = clean_headers(headers or {})
+    headers.setdefault("User-Agent", "Mozilla/5.0")
+    headers["Accept"] = "application/json"
     if cookie:
         headers["Cookie"] = cookie
-    response = requests.get(OFFERS_URL, headers=headers, timeout=30)
-    response.raise_for_status()
-    check_login(response.text, response.url)
-    return parse_offers(response.text, selector)
-
-
-def get_offers_with_login(selector=None):
-    """Let the user authenticate directly with Waterloo in a temporary browser."""
-    try:
-        from playwright.sync_api import Error as PlaywrightError
-        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:
+    if not headers.get("Cookie") and not cookies:
         raise ValueError(
-            "Install browser support: python -m pip install playwright, "
-            "then python -m playwright install chromium"
-        ) from exc
-
-    with sync_playwright() as playwright:
-        browser = None
-        try:
-            browser = playwright.chromium.launch(headless=False)
-            page = browser.new_page()
-            page.goto(OFFERS_URL, wait_until="domcontentloaded", timeout=60000)
-            input("Sign in in the browser. When your offers are visible, press Enter here: ")
-            page.goto(OFFERS_URL, wait_until="domcontentloaded", timeout=60000)
-            check_login(page.content(), page.url)
-            try:
-                page.locator(selector or "main table, main .offer, main .offer-card, main .card, main article").first.wait_for(timeout=10000)
-            except PlaywrightTimeoutError:
-                pass  # parse_offers provides the more useful layout/empty-page error.
-            return parse_offers(page.content(), selector)
-        except PlaywrightError as exc:
-            raise ValueError(
-                f"Browser error: {exc}\nIf Chromium is missing, run "
-                "python -m playwright install chromium."
-            ) from exc
-        finally:
-            if browser is not None:
-                browser.close()
+            "No session cookies configured. Save curl.trillworks Python output as "
+            "request.py beside this script, save Copy as cURL (bash) as request.curl, "
+            "or set WUSA_COOKIE. If you edited request.example.py, save it as request.py."
+        )
+    response = requests.get(OFFERS_API_URL, headers=headers, cookies=cookies or {}, timeout=30)
+    if response.status_code in {401, 403}:
+        raise ValueError("WUSA rejected the session cookies. Copy a fresh authenticated request into request.py.")
+    response.raise_for_status()
+    try:
+        data = response.json()
+    except ValueError as exc:
+        check_login(response.text, response.url)
+        raise ValueError("WUSA returned HTML instead of offers JSON. Check your session cookies.") from exc
+    return parse_api_offers(data)
 
 
 def print_offers(offers):
@@ -143,17 +234,27 @@ def print_offers(offers):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group()
-    source.add_argument("--login", action="store_true", help="Open a browser for manual Waterloo sign-in")
+    source.add_argument("--request-file", type=Path, help="Python output from curl.trillworks (reads headers/cookies only)")
+    source.add_argument("--curl-file", type=Path, help="Browser request copied as cURL (bash)")
     source.add_argument("--html", type=Path, help="Parse an already saved offers HTML file offline")
-    parser.add_argument("--selector", help="CSS selector matching each offer card")
+    parser.add_argument("--selector", help="CSS selector for offer cards when parsing --html")
     args = parser.parse_args()
     try:
         if args.html:
             offers = parse_offers(args.html.read_text(encoding="utf-8"), args.selector)
-        elif args.login:
-            offers = get_offers_with_login(args.selector)
         else:
-            offers = get_offers(os.environ.get("WUSA_COOKIE"), args.selector)
+            headers, cookies = {}, {}
+            if args.request_file:
+                headers, cookies = load_python_request(args.request_file)
+            elif args.curl_file:
+                headers, cookies = load_curl_request(args.curl_file)
+            elif (PROJECT_DIR / "request.py").is_file():
+                headers, cookies = load_python_request(PROJECT_DIR / "request.py")
+            elif (PROJECT_DIR / "request.curl").is_file():
+                headers, cookies = load_curl_request(PROJECT_DIR / "request.curl")
+            offers = get_offers(
+                os.environ.get("WUSA_COOKIE"), args.selector, headers=headers, cookies=cookies
+            )
         print_offers(offers)
     except (requests.RequestException, OSError, ValueError, EOFError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
