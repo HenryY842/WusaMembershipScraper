@@ -1,5 +1,3 @@
-"""Fetch WUSA offers and print their details to the terminal."""
-
 import argparse
 import ast
 import os
@@ -18,7 +16,7 @@ PROJECT_DIR = Path(__file__).resolve().parent
 
 
 def clean_headers(headers):
-    """Let requests supply transport headers and request fresh HTML."""
+    #Let requests supply transport headers and request fresh HTML.
     ignored = {"host", "content-length", "accept-encoding", "if-none-match", "if-modified-since"}
     return requests.structures.CaseInsensitiveDict(
         (name, value) for name, value in headers.items()
@@ -27,7 +25,7 @@ def clean_headers(headers):
 
 
 def load_python_request(path):
-    """Read curl.trillworks headers/cookies as literal data, without executing code."""
+    #Read curl.trillworks headers/cookies as literal data, without executing code.
     try:
         tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     except SyntaxError as exc:
@@ -54,7 +52,7 @@ def load_python_request(path):
 
 
 def load_curl_request(path):
-    """Read headers from 'Copy as cURL (bash)'; never run the command."""
+    #Read headers from 'Copy as cURL (bash)'; never run the command.
     command = re.sub(r"\\\r?\n", " ", path.read_text(encoding="utf-8-sig"))
     tokens = shlex.split(command)
     if not tokens or tokens[0] not in {"curl", "curl.exe"}:
@@ -102,7 +100,7 @@ def check_login(html, url=OFFERS_URL):
 
 
 def parse_offers(html, selector=None):
-    """Extract table rows or offer cards, preserving all displayed details."""
+    #Extract table rows or offer cards, preserving all displayed details.
     check_login(html)
     soup = BeautifulSoup(html, "html.parser")
     for element in soup.select("nav, footer, script, style, #breadcrumbs"):
@@ -162,7 +160,7 @@ def parse_offers(html, selector=None):
 
 
 def parse_api_offers(data):
-    """Normalize the JSON used by WUSA's JavaScript offers page."""
+    #Normalize the JSON used by WUSA's JavaScript offers page.
     if not isinstance(data, dict) or data.get("success") is not True:
         message = data.get("message") if isinstance(data, dict) else None
         raise ValueError(message or "WUSA could not load offers. Check your session cookies.")
