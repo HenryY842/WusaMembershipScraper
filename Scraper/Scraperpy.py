@@ -14,7 +14,6 @@ OFFERS_URL = "https://member.wusa.ca/your_offers"
 OFFERS_API_URL = "https://member.wusa.ca/api/member_offers/your_offers"
 PROJECT_DIR = Path(__file__).resolve().parent
 
-
 def clean_headers(headers):
     #Let requests supply transport headers and request fresh HTML.
     ignored = {"host", "content-length", "accept-encoding", "if-none-match", "if-modified-since"}
