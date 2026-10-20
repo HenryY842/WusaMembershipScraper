@@ -1,3 +1,5 @@
 __pycache__/
 request.py
 request.curl
+.classification_cache.json
+.env

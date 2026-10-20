@@ -1,10 +1,13 @@
 import argparse
+import hashlib
+import json
 import ast
 import os
 from pathlib import Path
 import re
 import shlex
 import sys
+from typing import Literal
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -227,7 +230,6 @@ def print_offers(offers):
             print(f"   Link: {link}")
         print()
 
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group()
@@ -235,6 +237,10 @@ def main():
     source.add_argument("--curl-file", type=Path, help="Browser request copied as cURL (bash)")
     source.add_argument("--html", type=Path, help="Parse an already saved offers HTML file offline")
     parser.add_argument("--selector", help="CSS selector for offer cards when parsing --html")
+    parser.add_argument("--classify", action="store_true", help="Classify scraped offers with Gemini (requires GEMINI_API_KEY)")
+    parser.add_argument("--gemini-model", default=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"), help="Gemini model for classification")
+    parser.add_argument("--cache-file", type=Path, default=PROJECT_DIR / ".classification_cache.json", help="Classification cache path")
+    parser.add_argument("--output", type=Path, help="Export offers to JSON, with classifications when --classify is used")
     args = parser.parse_args()
     try:
         if args.html:
@@ -252,7 +258,18 @@ def main():
             offers = get_offers(
                 os.environ.get("WUSA_COOKIE"), args.selector, headers=headers, cookies=cookies
             )
+        if args.classify:
+            from offer_classification import classify_offers
+            offers = classify_offers(offers, args.cache_file, args.gemini_model)
         print_offers(offers)
+        if args.classify:
+            for offer in offers:
+                result = offer["classification"]
+                print(f"{offer['title']}: {result['category']} ({result['confidence']:.0%}) — {result['reason']}")
+        if args.output:
+            from offer_classification import export_offers
+            export_offers(offers, args.output)
+            print(f"Exported {len(offers)} offer(s) to {args.output}")
     except (requests.RequestException, OSError, ValueError, EOFError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
