@@ -23,8 +23,7 @@ def clean_headers(headers):
     return requests.structures.CaseInsensitiveDict(
         (name, value) for name, value in headers.items()
         if name.lower() not in ignored and not name.startswith(":")
-    )
-
+)
 
 def load_python_request(path):
     #Read curl.trillworks headers/cookies as literal data, without executing code.
@@ -51,7 +50,6 @@ def load_python_request(path):
                 raise ValueError(f"{target.id} must contain string names and values without newlines.")
             data[target.id] = value
     return clean_headers(data["headers"]), data["cookies"]
-
 
 def load_curl_request(path):
     #Read headers from 'Copy as cURL (bash)'; never run the command.
@@ -88,7 +86,6 @@ def load_curl_request(path):
         index += 1
     return clean_headers(headers), {}
 
-
 def check_login(html, url=OFFERS_URL):
     soup = BeautifulSoup(html, "html.parser")
     if urlparse(url).path.rstrip("/") in {"/login", "/users/sign_in"} or soup.select_one(
@@ -99,7 +96,6 @@ def check_login(html, url=OFFERS_URL):
             "Copy a fresh authenticated offers request into request.py or request.curl "
             "and run the scraper again."
         )
-
 
 def parse_offers(html, selector=None):
     #Extract table rows or offer cards, preserving all displayed details.
@@ -160,7 +156,6 @@ def parse_offers(html, selector=None):
         )
     return offers
 
-
 def parse_api_offers(data):
     #Normalize the JSON used by WUSA's JavaScript offers page.
     if not isinstance(data, dict) or data.get("success") is not True:
@@ -195,7 +190,6 @@ def parse_api_offers(data):
             offers.append({"title": record["title"], "details": details, "links": links})
     return offers
 
-
 def get_offers(cookie=None, selector=None, headers=None, cookies=None):
     headers = clean_headers(headers or {})
     headers.setdefault("User-Agent", "Mozilla/5.0")
@@ -218,7 +212,6 @@ def get_offers(cookie=None, selector=None, headers=None, cookies=None):
         check_login(response.text, response.url)
         raise ValueError("WUSA returned HTML instead of offers JSON. Check your session cookies.") from exc
     return parse_api_offers(data)
-
 
 def print_offers(offers):
     print(f"Found {len(offers)} offer(s).\n")
@@ -277,7 +270,6 @@ def main():
         print("\nCancelled.", file=sys.stderr)
         return 130
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
