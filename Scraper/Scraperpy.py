@@ -182,7 +182,9 @@ def parse_api_offers(data):
                 details.append(f"Expires: {record['expiration_date']}")
             if "claimed" in record:
                 details.append(f"Claimed: {'Yes' if record['claimed'] else 'No'}")
-            urls = [record.get("document_url")] + [a.get("href") for a in description.select("a[href]")]
+            urls = ([record.get("document_url")]
+                    + [a.get("href") for a in description.select("a[href]")]
+                    + [img.get("src") for img in description.select("img[src]")])
             links = list(dict.fromkeys(
                 urljoin(OFFERS_URL, url) for url in urls
                 if isinstance(url, str) and url and urlparse(urljoin(OFFERS_URL, url)).scheme in {"http", "https"}
@@ -229,17 +231,33 @@ def main():
     source.add_argument("--request-file", type=Path, help="Python output from curl.trillworks (reads headers/cookies only)")
     source.add_argument("--curl-file", type=Path, help="Browser request copied as cURL (bash)")
     source.add_argument("--html", type=Path, help="Parse an already saved offers HTML file offline")
+    source.add_argument("--offers-file", type=Path, help="Read exported offers JSON instead of scraping (can geocode without Gemini)")
     parser.add_argument("--selector", help="CSS selector for offer cards when parsing --html")
     parser.add_argument("--classify", action="store_true", help="Classify scraped offers with Gemini (requires GEMINI_API_KEY)")
+    parser.add_argument("--no-follow-links", action="store_true", help="Classify only WUSA text; skip linked webpages and posters")
+    parser.add_argument("--refresh-links", action="store_true", help="Re-read linked evidence and reclassify instead of using cached results")
+    parser.add_argument("--geocode", action="store_true", help="Look up found business addresses/places with Nominatim and export coordinates")
+    parser.add_argument("--geocode-cache", type=Path, default=PROJECT_DIR / ".geocoding_cache.json", help="Nominatim result cache")
+    parser.add_argument("--geocode-region", default="Waterloo, Ontario, Canada", help="Context for business place-name searches")
+    parser.add_argument("--geocode-country", default="ca", help="Nominatim country-code filter (default: ca)")
     parser.add_argument("--gemini-model", default=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"), help="Gemini model for classification")
     parser.add_argument("--cache-file", type=Path, default=PROJECT_DIR / ".classification_cache.json", help="Classification cache path")
-    parser.add_argument("--output", type=Path, help="Export offers to JSON, with classifications when --classify is used")
+    parser.add_argument("--output", type=Path, help="JSON export path (defaults to Scraper/offers.json with --classify)")
     args = parser.parse_args()
+    if args.refresh_links and (not args.classify or args.no_follow_links):
+        parser.error("--refresh-links requires --classify and cannot be used with --no-follow-links")
     try:
-        if args.html:
+        headers, cookies = {}, {}
+        if args.offers_file:
+            data = json.loads(args.offers_file.read_text(encoding="utf-8-sig"))
+            if not isinstance(data, dict) or not isinstance(data.get("offers"), list):
+                raise ValueError("The offers file must contain an offers array.")
+            offers = data["offers"]
+            if not all(isinstance(offer, dict) and isinstance(offer.get("title"), str) for offer in offers):
+                raise ValueError("Every saved offer must have a title.")
+        elif args.html:
             offers = parse_offers(args.html.read_text(encoding="utf-8"), args.selector)
         else:
-            headers, cookies = {}, {}
             if args.request_file:
                 headers, cookies = load_python_request(args.request_file)
             elif args.curl_file:
@@ -253,16 +271,40 @@ def main():
             )
         if args.classify:
             from offer_classification import classify_offers
-            offers = classify_offers(offers, args.cache_file, args.gemini_model)
+            from offer_sources import OfferSourceReader
+            source_headers = requests.structures.CaseInsensitiveDict(headers)
+            if os.environ.get("WUSA_COOKIE"):
+                source_headers["Cookie"] = os.environ["WUSA_COOKIE"]
+            offers = classify_offers(
+                offers, args.cache_file, args.gemini_model,
+                follow_links=not args.no_follow_links,
+                source_reader=OfferSourceReader(source_headers, cookies),
+                refresh_links=args.refresh_links,
+            )
+        if args.geocode:
+            from offer_geocoding import geocode_offers
+            offers = geocode_offers(offers, args.geocode_cache, region=args.geocode_region,
+                                   countrycodes=args.geocode_country)
+        output_path = args.output
+        if (args.classify or args.geocode) and output_path is None:
+            output_path = args.offers_file or PROJECT_DIR / "offers.json"
+        if output_path is not None:
+            from offer_classification import export_offers
+            export_offers(offers, output_path)
         print_offers(offers)
         if args.classify:
             for offer in offers:
                 result = offer["classification"]
                 print(f"{offer['title']}: {result['category']} ({result['confidence']:.0%}) — {result['reason']}")
-        if args.output:
-            from offer_classification import export_offers
-            export_offers(offers, args.output)
-            print(f"Exported {len(offers)} offer(s) to {args.output}")
+                if result["locations"]:
+                    print(f"   Locations: {'; '.join(result['locations'])}")
+                if result["addresses"]:
+                    print(f"   Addresses: {'; '.join(result['addresses'])}")
+        if args.geocode:
+            matched = sum(place["status"] == "matched" for offer in offers for place in offer["geocoded_locations"])
+            print(f"Geocoded {matched} offer location(s); unresolved results have no map marker.")
+        if output_path is not None:
+            print(f"Exported {len(offers)} offer(s) to {output_path}")
     except (requests.RequestException, OSError, ValueError, EOFError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

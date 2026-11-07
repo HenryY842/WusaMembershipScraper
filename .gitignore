@@ -2,4 +2,5 @@ __pycache__/
 request.py
 request.curl
 .classification_cache.json
+.geocoding_cache.json
 .env
