@@ -33,6 +33,9 @@ class ClassificationTests(unittest.TestCase):
         reader_patch = patch("offer_sources.OfferSourceReader.collect", return_value={"sources": [], "media": [], "complete": True})
         self.read_sources = reader_patch.start()
         self.addCleanup(reader_patch.stop)
+        geocode_patch = patch("offer_geocoding.geocode_offers", side_effect=lambda offers, *args, **kwargs: [{**offer, "geocoded_locations": []} for offer in offers])
+        self.geocode = geocode_patch.start()
+        self.addCleanup(geocode_patch.stop)
 
     def classify(self, offers=None, client=None, model="test-model"):
         return classification.classify_offers(self.offers if offers is None else offers, self.cache, model, client or fake_client())

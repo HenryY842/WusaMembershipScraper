@@ -23,10 +23,13 @@
 <body>
     <h1> The Better Wusa_Membership Website </h1>
     <p id="map-status" role="status">Loading offer locations...</p>
+    <button id="show-offers" type="button" disabled>Show all offer pins</button>
     <div id="map" data-offers-url="../Scraper/offers.json"></div>
 
     <section class="In-Person-Section">
-        <h2>TESTING</h2>
+        <h2>In-person and online/in-person offers</h2>
+        <p>Numbers on pins show how many offers share that location.</p>
+        <ul id="offer-locations"></ul>
     </section>
 </body>
 

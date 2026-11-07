@@ -23,19 +23,39 @@ class MapTests(unittest.TestCase):
         ]}
         stub = """
             window.markerCount = 0;
-            Object.defineProperty(navigator, 'geolocation', { value: undefined });
+            window.fitCalls = 0;
+            window.setViewCalls = 0;
+            window.popupCalls = 0;
+            Object.defineProperty(navigator, 'geolocation', { value: {
+                watchPosition(callback) { window.gpsCallback = callback; }
+            } });
             window.L = {
-                map: () => ({ setView() {}, fitBounds() {} }),
+                map: () => ({ setView() { window.setViewCalls += 1; }, fitBounds() { window.fitCalls += 1; }, removeLayer() {} }),
                 tileLayer: () => ({ addTo() {} }),
+                divIcon: (options) => { window.pinBadge = options.html; return options; },
                 marker: () => ({ addTo() { window.markerCount += 1; return this; },
-                                bindPopup(node) { document.body.append(node); return this; } }),
+                                bindPopup(node) { document.body.append(node); return this; },
+                                bindTooltip(node) { document.body.append(node); return this; },
+                                openPopup() { window.popupCalls += 1; return this; } }),
+                circle: () => ({ addTo() { return this; }, getBounds() { return []; } }),
                 featureGroup: () => ({ getBounds() { return []; } })
             };
         """
-        html = ('<!doctype html><div id="map-status"></div><div id="map" data-offers-url="offers.json"></div>'
+        html = ('<!doctype html><div id="map-status"></div><button id="show-offers" disabled>Show offers</button><div id="map" data-offers-url="offers.json"></div><ul id="offer-locations"></ul>'
                 + '<script>' + stub + '\nwindow.fetch = async () => ({ok:true,json:async () => ('
                 + json.dumps(data) + ')});\n' + script
-                + '\nsetTimeout(() => document.body.dataset.markers = window.markerCount, 100);</script>')
+                + '''\nsetTimeout(() => {
+                    document.body.dataset.markers = window.markerCount;
+                    const beforeGps = window.fitCalls;
+                    window.gpsCallback({coords:{latitude:44,longitude:-80,accuracy:10}});
+                    document.body.dataset.gpsMovedMap = String(window.fitCalls !== beforeGps);
+                    document.getElementById('show-offers').click();
+                    document.body.dataset.refocused = String(window.fitCalls === beforeGps + 1);
+                    document.body.dataset.badge = window.pinBadge;
+                    const beforeFocus = window.setViewCalls;
+                    document.querySelector('#offer-locations button').click();
+                    document.body.dataset.offerFocused = String(window.setViewCalls === beforeFocus + 1 && window.popupCalls === 1);
+                }, 100);</script>''')
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             page = root / "map-test.html"
@@ -48,9 +68,16 @@ class MapTests(unittest.TestCase):
             dom = result.stdout.decode("utf-8", errors="replace")
             self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", errors="replace")[-1000:])
             self.assertIn('data-markers="1"', dom)
-            self.assertIn("1 mapped location(s). 1 location(s) need an address or match review.", dom)
+            self.assertIn("1/2 in-person offers and 1/1 online/in-person offers mapped across 1 locations. 1 location(s) need an address or match review.", dom)
             self.assertIn("&lt;img src=x onerror=alert(1)&gt;", dom)
             self.assertIn("Other offer, same building</strong>", dom)
+            self.assertIn("Address found by Nominatim:</strong>", dom)
+            self.assertIn("Business address</p>", dom)
+            self.assertIn('data-gps-moved-map="false"', dom)
+            self.assertIn('data-refocused="true"', dom)
+            self.assertIn('data-offer-focused="true"', dom)
+            self.assertIn('data-badge="&lt;span&gt;2&lt;/span&gt;"', dom)
+            self.assertIn('Multiple possible matches; this address needs review.', dom)
 
 
 if __name__ == "__main__":

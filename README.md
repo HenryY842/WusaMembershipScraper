@@ -83,7 +83,8 @@ of explicitly stated place names or addresses), plus `addresses` (street/postal
 addresses only). Missing street addresses stay `[]`; building names remain in
 `locations`. Older saved results can populate `addresses` from street addresses
 already present in their location text. Gemini does not generate coordinates;
-the optional Nominatim step below looks them up.
+Nominatim looks them up by default during classification (use `--no-geocode`
+to skip coordinate searches).
 
 `--classify` also downloads each offer's linked webpages and posters. Webpage
 text (including structured addresses), PDF files, and PNG/JPEG/WebP/HEIC/HEIF
@@ -195,8 +196,13 @@ and filter using `offer.classification?.category`.
 Classify and automatically geocode found business addresses or place names:
 
 ```powershell
-python Scraper/Scraperpy.py --classify --geocode
+python Scraper/Scraperpy.py --classify
 ```
+
+Geocoding is enabled automatically with `--classify`, so regular classification
+runs keep map coordinates in the exported JSON. `--geocode` remains available
+for saved offers without classification. Use `--classify --no-geocode` when you
+intentionally want to skip Nominatim.
 
 Geocode the existing JSON without scraping or using a Gemini API key:
 
@@ -236,6 +242,12 @@ are restricted by `--geocode-country` (default `ca`). Multiple plausible matches
 broad city/street results, unmatched street numbers/names, and failed requests
 do not get marker coordinates. Inspect `ambiguous`, `not_found`, or `error`
 statuses for unresolved locations rather than assuming every offer is mapped.
+When several results share an address, an exact match between the business name
+and the offer title can identify the right shop. Otherwise a single numbered
+building matching the street and city can be mapped with `precision: "address"`;
+this locates the supplied street address rather than confirming a storefront.
+Unresolved candidate ties remain unplotted. This selection also works on cached
+results without new Nominatim requests.
 
 **Public Nominatim usage:** follow the
 [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/).
@@ -255,8 +267,15 @@ your WUSA cookies or Gemini key. Its requests use the
 [Nominatim search API](https://nominatim.org/release-docs/latest/api/Search/).
 
 The existing Leaflet page reads `Scraper/offers.json` and plots only results with
-`status: "matched"`. Offers at the same coordinates share a popup. OpenStreetMap
-attribution remains visible. Serve the entire project root so the page can fetch
+`status: "matched"`. Hover over a pin to see its label; click it to see the
+address found by Nominatim and the offers there. Offers at the same coordinates
+share a popup. The map opens around the offer pins and GPS updates do not move
+it away from them. The "Show all offer pins" button restores their view.
+Each pin shows the number of offers sharing it. The status reports mapped offers
+separately for `IN_PERSON` and `BOTH`, rather than treating the pin count as the
+offer count. The list below the map includes every such offer, its addresses,
+"Show on map" buttons, and any unresolved locations.
+OpenStreetMap attribution remains visible. Serve the entire project root so the page can fetch
 its sibling `Scraper` folder:
 
 ```powershell

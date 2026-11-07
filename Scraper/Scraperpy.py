@@ -236,7 +236,8 @@ def main():
     parser.add_argument("--classify", action="store_true", help="Classify scraped offers with Gemini (requires GEMINI_API_KEY)")
     parser.add_argument("--no-follow-links", action="store_true", help="Classify only WUSA text; skip linked webpages and posters")
     parser.add_argument("--refresh-links", action="store_true", help="Re-read linked evidence and reclassify instead of using cached results")
-    parser.add_argument("--geocode", action="store_true", help="Look up found business addresses/places with Nominatim and export coordinates")
+    parser.add_argument("--geocode", action=argparse.BooleanOptionalAction, default=None,
+                        help="Look up business addresses/places with Nominatim (enabled by default with --classify; --no-geocode skips it)")
     parser.add_argument("--geocode-cache", type=Path, default=PROJECT_DIR / ".geocoding_cache.json", help="Nominatim result cache")
     parser.add_argument("--geocode-region", default="Waterloo, Ontario, Canada", help="Context for business place-name searches")
     parser.add_argument("--geocode-country", default="ca", help="Nominatim country-code filter (default: ca)")
@@ -244,6 +245,7 @@ def main():
     parser.add_argument("--cache-file", type=Path, default=PROJECT_DIR / ".classification_cache.json", help="Classification cache path")
     parser.add_argument("--output", type=Path, help="JSON export path (defaults to Scraper/offers.json with --classify)")
     args = parser.parse_args()
+    geocode_enabled = args.geocode if args.geocode is not None else args.classify
     if args.refresh_links and (not args.classify or args.no_follow_links):
         parser.error("--refresh-links requires --classify and cannot be used with --no-follow-links")
     try:
@@ -281,12 +283,12 @@ def main():
                 source_reader=OfferSourceReader(source_headers, cookies),
                 refresh_links=args.refresh_links,
             )
-        if args.geocode:
+        if geocode_enabled:
             from offer_geocoding import geocode_offers
             offers = geocode_offers(offers, args.geocode_cache, region=args.geocode_region,
                                    countrycodes=args.geocode_country)
         output_path = args.output
-        if (args.classify or args.geocode) and output_path is None:
+        if (args.classify or geocode_enabled) and output_path is None:
             output_path = args.offers_file or PROJECT_DIR / "offers.json"
         if output_path is not None:
             from offer_classification import export_offers
@@ -300,7 +302,7 @@ def main():
                     print(f"   Locations: {'; '.join(result['locations'])}")
                 if result["addresses"]:
                     print(f"   Addresses: {'; '.join(result['addresses'])}")
-        if args.geocode:
+        if geocode_enabled:
             matched = sum(place["status"] == "matched" for offer in offers for place in offer["geocoded_locations"])
             print(f"Geocoded {matched} offer location(s); unresolved results have no map marker.")
         if output_path is not None:

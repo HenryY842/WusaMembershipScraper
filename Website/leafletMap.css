@@ -3,4 +3,36 @@
     width: 100%;
 }
 
+.offer-count-pin {
+    background: #1760a5;
+    border: 2px solid white;
+    border-radius: 50% 50% 50% 0;
+    box-shadow: 0 2px 5px #0006;
+    color: white;
+    display: grid;
+    place-items: center;
+    transform-origin: center;
+}
+
+.offer-count-pin span {
+    font: bold 16px/1 sans-serif;
+}
+
+#offer-locations {
+    padding-left: 1.5rem;
+}
+
+#offer-locations li {
+    margin: 1rem 0;
+}
+
+#offer-locations p {
+    margin: .3rem 0;
+}
+
+#offer-locations button {
+    margin: .2rem 0 .6rem;
+    cursor: pointer;
+}
+
 

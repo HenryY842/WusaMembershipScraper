@@ -74,6 +74,33 @@ class GeocodingTests(unittest.TestCase):
         result = geo.select_result([match()], "Student Life Centre, Waterloo, Ontario, Canada")
         self.assertEqual(result["status"], "not_found")
 
+    def test_business_name_resolves_multiple_places_at_one_address(self):
+        building = geo.candidate(match(1))
+        other = {**geo.candidate(match(2)), "address_details": {**match()["address"], "shop": "Other shop"}}
+        business = {**geo.candidate(match(3)), "address_details": {**match()["address"], "shop": "Water deal"}}
+        unresolved = {"status": "ambiguous", "candidates": [building, other, business], "cached": True}
+        selected = geo.resolve_for_offer(unresolved, offer(), "35 University Ave E, Waterloo")
+        self.assertEqual(selected["status"], "matched")
+        self.assertEqual(selected["osm_id"], 3)
+        self.assertEqual(selected["match_method"], "business_name")
+        self.assertTrue(selected["cached"])
+        self.assertEqual(unresolved["status"], "ambiguous")
+
+    def test_exact_numbered_building_resolves_shops_but_is_labelled_address_precision(self):
+        building = {**geo.candidate(match(1)), "address_details": {**match()["address"], "city": "Waterloo"}}
+        shop = {**geo.candidate(match(2)), "address_details": {**match()["address"], "city": "Waterloo", "shop": "Other shop"}}
+        unresolved = {"status": "ambiguous", "candidates": [building, shop]}
+        selected = geo.resolve_for_offer(unresolved, offer(), "35 University Ave E, Waterloo")
+        self.assertEqual(selected["osm_id"], 1)
+        self.assertEqual(selected["precision"], "address")
+        self.assertEqual(geo.resolve_for_offer(unresolved, offer(), "35 University Ave E, Kitchener")["status"], "ambiguous")
+
+    def test_multiple_matching_businesses_still_require_review(self):
+        businesses = [{**geo.candidate(match(i)), "address_details": {**match()["address"], "shop": "Water deal"}} for i in (1, 2)]
+        selected = geo.resolve_for_offer({"status": "ambiguous", "candidates": businesses}, offer(), "35 University Ave E, Waterloo")
+        self.assertEqual(selected["status"], "ambiguous")
+        self.assertNotIn("lat", selected)
+
     def test_invalid_coordinates_are_rejected(self):
         for lat, lon in [("nan", "-80"), ("43", "181"), ("91", "-80")]:
             with self.subTest(lat=lat, lon=lon), self.assertRaises(ValueError):
@@ -139,6 +166,23 @@ class GeocodingTests(unittest.TestCase):
             self.assertEqual(scraper.main(), 0)
         self.assertEqual(json.loads(saved.read_text(encoding="utf-8"))["offers"][0]["geocoded_locations"][0]["status"], "not_found")
         geocode.assert_called_once()
+
+    def test_classification_geocodes_by_default_and_can_explicitly_skip(self):
+        saved = self.root / "offers.json"
+        value = offer(addresses=["35 University Ave E, Waterloo"])
+        classification.export_offers([value], saved)
+        places = [{"status": "matched", "lat": 43.47, "lon": -80.52, "display_name": "Business address"}]
+        output = [{**value, "geocoded_locations": places}]
+        args = ["Scraperpy.py", "--offers-file", str(saved), "--classify"]
+        with patch.object(classification, "classify_offers", return_value=[value]), patch.object(geo, "geocode_offers", return_value=output) as geocode, contextlib.redirect_stdout(io.StringIO()):
+            with patch.object(sys, "argv", args):
+                self.assertEqual(scraper.main(), 0)
+            geocode.assert_called_once()
+            self.assertEqual(json.loads(saved.read_text(encoding="utf-8"))["offers"][0]["geocoded_locations"], places)
+            geocode.reset_mock()
+            with patch.object(sys, "argv", args + ["--no-geocode"]):
+                self.assertEqual(scraper.main(), 0)
+            geocode.assert_not_called()
 
 
 if __name__ == "__main__":

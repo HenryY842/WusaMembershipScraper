@@ -91,6 +91,43 @@ def select_result(values, input_address):
     return {"status": "not_found"}
 
 
+def resolve_for_offer(result, offer, input_address):
+    """Distinguish businesses at one street address using the offer's business name."""
+    if result.get("status") != "ambiguous":
+        return result
+    matches = result.get("candidates", [])
+
+    def name(value):
+        return "".join(re.findall(r"\w+", value.casefold()))
+
+    business_fields = ("shop", "amenity", "office", "tourism", "craft", "leisure")
+    named = [item for item in matches if any(
+        name(str(item.get("address_details", {}).get(field, ""))) == name(offer["title"])
+        for field in business_fields
+    )]
+    if len(named) == 1:
+        return {**result, **named[0], "status": "matched", "match_method": "business_name"}
+    if named:
+        return result
+    # A numbered address can identify a building/plaza even when its shops differ.
+    parts = input_address.split(",")
+    number = re.match(r"^\s*(\d+[A-Za-z]?)\b", input_address)
+    buildings = []
+    if number and len(parts) > 1:
+        for item in matches:
+            address = item.get("address_details", {})
+            city = address.get("city") or address.get("town") or address.get("village") or ""
+            if (str(address.get("house_number", "")).casefold() == number[1].casefold()
+                    and street_name(address.get("road", "")) == street_name(input_address)
+                    and name(city) == name(parts[1].strip())
+                    and not any(address.get(field) for field in business_fields)
+                    and re.match(r"^" + re.escape(number[1]) + r"\b", item.get("display_name", ""), re.I)):
+                buildings.append(item)
+    if len(buildings) == 1:
+        return {**result, **buildings[0], "status": "matched", "match_method": "street_address", "precision": "address"}
+    return result
+
+
 class NominatimGeocoder:
     def __init__(self, cache_path, *, url=None, user_agent=None, countrycodes="ca"):
         self.cache_path = Path(cache_path)
@@ -155,6 +192,7 @@ def geocode_offers(offers, cache_path, *, geocoder=None, region="Waterloo, Ontar
             # All campus labels resolve to one building query and share one cached lookup.
             lookup_address = item["query"] if item["precision"] == "building" else item["address"]
             result = geocoder.lookup(item["query"], lookup_address)
+            result = resolve_for_offer(result, offer, item["address"])
             places.append({**item, **result, "provider": "nominatim", "attribution": ATTRIBUTION})
         enriched.append({**offer, "geocoded_locations": places})
     return enriched
