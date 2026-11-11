@@ -1,184 +1,218 @@
-
+const categoryInfo = {
+    ONLINE: 'Online',
+    IN_PERSON: 'In person',
+    BOTH: 'Both',
+};
 const map = L.map('map');
-
 map.setView([43.4723, -80.5449], 14);
-
-// Add OpenStreetMap tiles
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 }).addTo(map);
 
-let marker, circle;
-let zoomed = false;
+let selectedCategory = 'IN_PERSON';
+let allOffers = [];
 let offerMarkers = [];
+let markersByCoordinates = new Map();
+let userMarker, accuracyCircle;
+let offersLoaded = false;
 
-// Track user location without moving away from the displayed business pins.
-if (navigator.geolocation) {
-    navigator.geolocation.watchPosition(success, error);
+function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
 }
-
-function showOfferLocations() {
-    if (offerMarkers.length) {
-        map.fitBounds(L.featureGroup(offerMarkers).getBounds(), { padding: [30, 30], maxZoom: 16 });
-        zoomed = true;
-    }
-}
-
-document.getElementById('show-offers').addEventListener('click', showOfferLocations);
-
-function success(pos) {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-    const accuracy = pos.coords.accuracy;
-
-    if (marker) {
-        map.removeLayer(marker);
-        map.removeLayer(circle);
-    }
-
-    // Display user location
-    marker = L.marker([lat, lng]).addTo(map);
-
-    // Display accuracy circle
-    circle = L.circle([lat, lng], {
-        radius: accuracy
-    }).addTo(map);
-
-    // Zoom to user location only once
-    if (!zoomed) {
-        map.fitBounds(circle.getBounds());
-        zoomed = true;
-    }
-}
-
-function error(err) {
-    console.info('User location unavailable; offer markers remain visible.', err.code);
-}
-
 function isMapped(place) {
-    return place.status === 'matched' && Number.isFinite(place.lat) && Number.isFinite(place.lon)
+    return place && place.status === 'matched' && Number.isFinite(place.lat) && Number.isFinite(place.lon)
         && Math.abs(place.lat) <= 90 && Math.abs(place.lon) <= 180;
 }
+function coordinateKey(place) { return `${place.lat},${place.lon}`; }
+function showOfferLocations() {
+    if (offerMarkers.length) map.fitBounds(L.featureGroup(offerMarkers).getBounds(), { padding: [45, 45], maxZoom: 16 });
+}
+document.getElementById('show-offers').addEventListener('click', showOfferLocations);
 
-function renderOfferList(offers, markersByCoordinates) {
-    const list = document.getElementById('offer-locations');
-    list.replaceChildren();
-    for (const offer of offers) {
-        if (!['IN_PERSON', 'BOTH'].includes(offer.classification?.category)) continue;
-        const row = document.createElement('li');
-        const title = document.createElement('strong');
-        title.textContent = offer.title;
-        const category = document.createElement('span');
-        category.textContent = offer.classification.category === 'BOTH' ? ' — Online and in person' : ' — In person';
-        row.append(title, category);
-        const places = offer.geocoded_locations || [];
-        if (!places.length) {
-            const message = document.createElement('p');
-            message.textContent = 'No physical address found yet.';
-            row.append(message);
-        }
-        for (const place of places) {
-            const address = document.createElement('p');
-            address.textContent = place.display_name || place.address || 'Address unavailable';
-            row.append(address);
-            if (isMapped(place)) {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.textContent = 'Show on map';
-                button.addEventListener('click', () => {
-                    map.setView([place.lat, place.lon], 17);
-                    markersByCoordinates.get(`${place.lat},${place.lon}`).openPopup();
-                });
-                row.append(button);
-            } else {
-                const message = document.createElement('p');
-                message.textContent = place.status === 'ambiguous'
-                    ? 'Multiple possible matches; this address needs review.'
-                    : 'This location has no confirmed map match yet.';
-                row.append(message);
-            }
-        }
-        list.append(row);
-    }
+if (navigator.geolocation) {
+    navigator.geolocation.watchPosition((position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        if (userMarker) { map.removeLayer(userMarker); map.removeLayer(accuracyCircle); }
+        userMarker = L.marker([latitude, longitude]).addTo(map).bindTooltip(element('span', '', 'Your location'));
+        accuracyCircle = L.circle([latitude, longitude], { radius: accuracy, color: '#8d741e', fillOpacity: 0.06, weight: 1 }).addTo(map);
+        if (!offersLoaded && !offerMarkers.length) map.fitBounds(accuracyCircle.getBounds());
+    }, (error) => console.info('User location unavailable; student offers remain visible.', error.code));
 }
 
-async function loadOfferLocations() {
-    const status = document.getElementById('map-status');
-    const url = document.getElementById('map').dataset.offersUrl;
+function conciseAddress(place) {
+    const address = place.address_details || {};
+    const street = [address.house_number, address.road].filter(Boolean).join(' ');
+    const city = address.city || address.town || address.village;
+    const state = address.state === 'Ontario' ? 'ON' : address.state;
+    const parts = [place.precision === 'building' ? address.building || 'Student Life Centre' : street, city, state, address.postcode].filter(Boolean);
+    return parts.length ? parts.join(', ') : place.display_name || place.address || 'Address not listed';
+}
+function safeLink(value) {
     try {
-        const response = await fetch(url, { cache: 'no-store' });
+        const url = new URL(value);
+        return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password ? url : null;
+    } catch { return null; }
+}
+function sourceLinks(offer, destination) {
+    const links = [...new Set(offer.links || [])].map(safeLink).filter(Boolean);
+    for (const url of links) {
+        const wrapper = element('div', 'source-wrapper');
+        const poster = /download_file|\.(pdf|png|jpe?g|webp)$/i.test(url.pathname);
+        const link = element('a', 'source-link', poster ? 'Offer poster' : 'View offer');
+        link.href = url.href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        wrapper.append(link, element('p', 'source-host', url.hostname.replace(/^www\./, '')));
+        destination.append(wrapper);
+    }
+    if (!links.length) destination.append(element('p', 'lookup-message', 'No link available.'));
+}
+function focusPlace(place) {
+    map.setView([place.lat, place.lon], 17);
+    markersByCoordinates.get(coordinateKey(place))?.openPopup();
+    const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.querySelector('.map-frame').scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+}
+function renderDestination(offer, destination) {
+    if (selectedCategory === 'ONLINE') {
+        sourceLinks(offer, destination);
+        return;
+    }
+    const places = offer.geocoded_locations || [];
+    for (const place of places) {
+        const block = element('div', 'destination-place');
+        const line = element('p', 'address-line');
+        line.textContent = conciseAddress(place);
+        block.append(line);
+        if (place.precision === 'building') block.append(element('p', 'place-context', place.address));
+        if (place.precision === 'address') block.append(element('p', 'place-context', 'Street-address location.'));
+        if (isMapped(place)) {
+            const button = element('button', 'map-link', 'Show on map');
+            button.type = 'button';
+            button.addEventListener('click', () => focusPlace(place));
+            block.append(button);
+        } else {
+            block.append(element('p', 'lookup-message', place.status === 'ambiguous' ? 'Several possible locations. This address needs review.' : 'This location does not have a confirmed map pin yet.'));
+        }
+        destination.append(block);
+    }
+    if (!places.length) {
+        const found = offer.classification?.addresses || offer.classification?.locations || [];
+        for (const address of found) destination.append(element('p', 'address-line', address));
+        destination.append(element('p', 'lookup-message', found.length ? 'Map location not confirmed.' : 'Address not listed.'));
+    }
+    sourceLinks(offer, destination);
+}
+function renderOfferList(offers) {
+    const list = document.getElementById('offer-locations');
+    list.replaceChildren();
+    offers.forEach((offer) => {
+        const row = element('li', 'offer-row');
+        const info = element('div', 'offer-info');
+        const copy = element('div', 'offer-copy');
+        const details = Array.isArray(offer.details) ? offer.details : [];
+        copy.append(element('strong', 'offer-name', offer.title));
+        const description = details.filter((detail) => !/^(Category|Expires|Claimed):/.test(detail)).join(' ');
+        copy.append(element('p', 'offer-description', description || 'See the offer for full details and redemption instructions.'));
+        const expiry = details.find((detail) => detail.startsWith('Expires:'));
+        if (expiry) copy.append(element('p', 'offer-expiry', 'Until ' + expiry.replace(/^Expires:\s*/, '')));
+        info.append(copy);
+        const destination = element('div', 'offer-destination');
+        renderDestination(offer, destination);
+        row.append(info, destination);
+        list.append(row);
+    });
+    document.getElementById('offers-empty').hidden = offers.length !== 0;
+}
+function addPins(offers) {
+    for (const pin of offerMarkers) map.removeLayer(pin);
+    offerMarkers = [];
+    markersByCoordinates = new Map();
+    const groups = new Map();
+    let mappedOffers = 0;
+    let unresolved = 0;
+    for (const offer of offers) {
+        const places = selectedCategory === 'ONLINE' ? [] : offer.geocoded_locations || [];
+        if (places.some(isMapped)) mappedOffers += 1;
+        if (!places.length) unresolved += 1;
+        for (const place of places) {
+            if (!isMapped(place)) { unresolved += 1; continue; }
+            const key = coordinateKey(place);
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push({ offer, place });
+        }
+    }
+    for (const [key, entries] of groups) {
+        const popup = element('div', 'offer-popup');
+        popup.append(element('p', 'popup-address', conciseAddress(entries[0].place)));
+        for (const { offer, place } of entries) {
+            const item = element('div', 'popup-item');
+            item.append(element('strong', '', offer.title), element('p', '', place.address));
+            if (place.precision === 'building') item.append(element('p', '', 'Building location; see the offer for the counter or floor.'));
+            if (place.precision === 'address') item.append(element('p', '', 'Address location; the exact storefront has not been confirmed.'));
+            popup.append(item);
+        }
+        const tooltip = element('span', '', entries.length > 1 ? `${conciseAddress(entries[0].place).split(',')[0]} · ${entries.length} offers` : entries[0].offer.title);
+        const icon = L.divIcon({ className: 'offer-count-pin', html: `<span class="pin-face"><b>${entries.length}</b></span>`, iconSize: [34, 40], iconAnchor: [17, 40], popupAnchor: [0, -34] });
+        const { lat, lon } = entries[0].place;
+        const pin = L.marker([lat, lon], { icon, riseOnHover: true }).addTo(map).bindPopup(popup).bindTooltip(tooltip);
+        offerMarkers.push(pin);
+        markersByCoordinates.set(key, pin);
+    }
+    document.getElementById('show-offers').disabled = !offerMarkers.length;
+    const status = document.getElementById('map-status');
+    if (selectedCategory === 'ONLINE') status.textContent = `${offers.length} online ${offers.length === 1 ? 'offer' : 'offers'}.`;
+    else status.textContent = `${mappedOffers}/${offers.length} offers mapped across ${groups.size} ${groups.size === 1 ? 'location' : 'locations'}.` + (unresolved ? ` ${unresolved} ${unresolved === 1 ? 'location needs' : 'locations need'} an address or match review.` : '');
+    showOfferLocations();
+}
+function selectCategory(category) {
+    if (!categoryInfo[category]) return;
+    selectedCategory = category;
+    for (const tab of document.querySelectorAll('[data-category]')) {
+        const active = tab.dataset.category === category;
+        tab.setAttribute('aria-selected', String(active));
+        tab.tabIndex = active ? 0 : -1;
+    }
+    document.getElementById('offers-panel').setAttribute('aria-labelledby', `tab-${category}`);
+    const offers = allOffers.filter((offer) => offer.classification?.category === category);
+    addPins(offers);
+    renderOfferList(offers);
+}
+const tabs = [...document.querySelectorAll('[data-category]')];
+for (const tab of tabs) {
+    tab.addEventListener('click', () => selectCategory(tab.dataset.category));
+    tab.addEventListener('keydown', (event) => {
+        let index = tabs.indexOf(tab);
+        if (event.key === 'ArrowRight') index = (index + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') index = (index + tabs.length - 1) % tabs.length;
+        else if (event.key === 'Home') index = 0;
+        else if (event.key === 'End') index = tabs.length - 1;
+        else return;
+        event.preventDefault();
+        tabs[index].focus();
+        selectCategory(tabs[index].dataset.category);
+    });
+}
+async function loadOffers() {
+    try {
+        const response = await fetch(document.getElementById('map').dataset.offersUrl, { cache: 'no-store' });
         if (!response.ok) throw new Error(`Offers HTTP ${response.status}`);
         const data = await response.json();
         if (!Array.isArray(data.offers)) throw new Error('Missing offers array');
-        const groups = new Map();
-        const totals = { IN_PERSON: 0, BOTH: 0 };
-        const mapped = { IN_PERSON: 0, BOTH: 0 };
-        let unresolved = 0;
-        for (const offer of data.offers) {
-            if (!['IN_PERSON', 'BOTH'].includes(offer.classification?.category)) continue;
-            const category = offer.classification.category;
-            totals[category] += 1;
-            const places = offer.geocoded_locations || [];
-            if (places.some(isMapped)) mapped[category] += 1;
-            if (!places.length) unresolved += 1;
-            for (const place of places) {
-                if (!isMapped(place)) {
-                    unresolved += 1;
-                    continue;
-                }
-                const key = `${place.lat},${place.lon}`;
-                if (!groups.has(key)) groups.set(key, []);
-                groups.get(key).push({ offer, place });
-            }
-        }
-        const markers = [];
-        const markersByCoordinates = new Map();
-        for (const entries of groups.values()) {
-            const popup = document.createElement('div');
-            const addressLabel = document.createElement('strong');
-            addressLabel.textContent = 'Address found by Nominatim:';
-            const address = document.createElement('p');
-            address.textContent = entries[0].place.display_name || entries[0].place.address;
-            popup.append(addressLabel, address);
-            for (const { offer, place } of entries) {
-                const title = document.createElement('strong');
-                title.textContent = offer.title;
-                const offerLocation = document.createElement('p');
-                offerLocation.textContent = place.address;
-                popup.append(title, offerLocation);
-                if (place.precision === 'building') {
-                    const note = document.createElement('p');
-                    note.textContent = 'Building location; the counter or floor is described in the offer.';
-                    popup.append(note);
-                } else if (place.precision === 'address') {
-                    const note = document.createElement('p');
-                    note.textContent = 'Street-address location; the exact storefront has not been confirmed.';
-                    popup.append(note);
-                }
-            }
-            const { lat, lon } = entries[0].place;
-            const tooltip = document.createElement('span');
-            const locationName = (entries[0].place.display_name || entries[0].place.address || '').split(',')[0];
-            tooltip.textContent = entries.length > 1 ? `${locationName} (${entries.length} offers)` : entries[0].offer.title;
-            const icon = L.divIcon({
-                className: 'offer-count-pin',
-                html: `<span>${entries.length}</span>`,
-                iconSize: [34, 36], iconAnchor: [17, 36], popupAnchor: [0, -32],
-            });
-            const pin = L.marker([lat, lon], { icon }).addTo(map).bindPopup(popup).bindTooltip(tooltip);
-            markers.push(pin);
-            markersByCoordinates.set(`${lat},${lon}`, pin);
-        }
-        offerMarkers = markers;
-        document.getElementById('show-offers').disabled = !markers.length;
-        showOfferLocations();
-        renderOfferList(data.offers, markersByCoordinates);
-        status.textContent = `${mapped.IN_PERSON}/${totals.IN_PERSON} in-person offers and ${mapped.BOTH}/${totals.BOTH} online/in-person offers mapped across ${groups.size} locations. ${unresolved} location(s) need an address or match review.`;
-    } catch (err) {
-        status.textContent = 'Offer locations could not be loaded. Serve the project folder over HTTP and generate the offer coordinates first.';
-        console.error(err);
+        allOffers = data.offers;
+        for (const count of document.querySelectorAll('[data-count]')) count.textContent = allOffers.filter((offer) => offer.classification?.category === count.dataset.count).length;
+        offersLoaded = true;
+        selectCategory(selectedCategory);
+    } catch (error) {
+        document.getElementById('map-status').textContent = 'Your offers could not be loaded. Please try again shortly.';
+        const empty = document.getElementById('offers-empty');
+        empty.textContent = location.protocol === 'file:' ? 'Open this page through the local web server so it can read your saved offers.' : 'We could not load the saved offers. Refresh the page to try again.';
+        empty.hidden = false;
+        console.error(error);
     }
 }
-
-loadOfferLocations();
+loadOffers();

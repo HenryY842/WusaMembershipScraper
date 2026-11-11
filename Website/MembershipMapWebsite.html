@@ -1,36 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>The Better Wusa_membership Website</title>
-
-    <!-- Leaflet CSS -->
+    <meta name="theme-color" content="#171815">
+    <title>Offers</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-
-    <!-- Your CSS -->
     <link rel="stylesheet" href="leafletMap.css">
-
-    <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-
-    <!-- Your JavaScript -->
     <script src="leafletMapScript.js" defer></script>
 </head>
-
 <body>
-    <h1> The Better Wusa_Membership Website </h1>
-    <p id="map-status" role="status">Loading offer locations...</p>
-    <button id="show-offers" type="button" disabled>Show all offer pins</button>
-    <div id="map" data-offers-url="../Scraper/offers.json"></div>
-
-    <section class="In-Person-Section">
-        <h2>In-person and online/in-person offers</h2>
-        <p>Numbers on pins show how many offers share that location.</p>
-        <ul id="offer-locations"></ul>
-    </section>
+    <a class="skip-link" href="#offers-panel">Skip to offers</a>
+    <main class="page-shell" aria-label="Student offers">
+        <div class="category-tabs" role="tablist" aria-label="Offer category">
+            <button id="tab-ONLINE" class="category-tab" role="tab" aria-selected="false" aria-controls="offers-panel" tabindex="-1" data-category="ONLINE">Online <span class="tab-count" data-count="ONLINE">—</span></button>
+            <button id="tab-IN_PERSON" class="category-tab" role="tab" aria-selected="true" aria-controls="offers-panel" tabindex="0" data-category="IN_PERSON">In person <span class="tab-count" data-count="IN_PERSON">—</span></button>
+            <button id="tab-BOTH" class="category-tab" role="tab" aria-selected="false" aria-controls="offers-panel" tabindex="-1" data-category="BOTH">Both <span class="tab-count" data-count="BOTH">—</span></button>
+        </div>
+        <div class="map-frame">
+            <div class="map-canvas">
+                <div id="map" data-offers-url="../Scraper/offers.json" aria-label="Map of offer locations"></div>
+                <button id="show-offers" class="map-reset" type="button" disabled>Show all pins</button>
+            </div>
+            <p id="map-status" role="status" aria-live="polite">Loading offers…</p>
+        </div>
+        <section id="offers-panel" class="offers-section" role="tabpanel" aria-labelledby="tab-IN_PERSON" tabindex="0">
+            <ul id="offer-locations" class="offer-list" aria-label="Offers and addresses"></ul>
+            <p id="offers-empty" class="empty-state" hidden>No offers in this category.</p>
+        </section>
+    </main>
 </body>
-
 </html>

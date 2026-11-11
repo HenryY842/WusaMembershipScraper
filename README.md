@@ -266,15 +266,21 @@ previous no-matches after correcting their addresses. Geocoding does not receive
 your WUSA cookies or Gemini key. Its requests use the
 [Nominatim search API](https://nominatim.org/release-docs/latest/api/Search/).
 
-The existing Leaflet page reads `Scraper/offers.json` and plots only results with
-`status: "matched"`. Hover over a pin to see its label; click it to see the
+The gold-and-black Leaflet page reads `Scraper/offers.json`. The Online, In person,
+and Both tabs filter the map and offer details together; In person is selected
+initially. Tabs support arrow keys, Home, and End. Online offers show their links
+without physical map pins. Each offer row includes its description, expiry when
+provided, and addresses/poster/website links. The two-column layout stacks on
+phones. No additional Nominatim requests are made by switching tabs.
+
+The map plots only results with `status: "matched"`. Hover over a pin to see its label; click it to see the
 address found by Nominatim and the offers there. Offers at the same coordinates
 share a popup. The map opens around the offer pins and GPS updates do not move
 it away from them. The "Show all offer pins" button restores their view.
-Each pin shows the number of offers sharing it. The status reports mapped offers
-separately for `IN_PERSON` and `BOTH`, rather than treating the pin count as the
-offer count. The list below the map includes every such offer, its addresses,
-"Show on map" buttons, and any unresolved locations.
+Each pin shows the number of offers in the selected category sharing it. The
+status counts mapped offers separately from map locations. The details below
+the map include every offer in the selected category, its addresses, "View on map"
+buttons, and any unresolved locations.
 OpenStreetMap attribution remains visible. Serve the entire project root so the page can fetch
 its sibling `Scraper` folder:
 
