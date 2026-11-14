@@ -17,6 +17,7 @@ button:disabled { cursor:default; opacity:.45; }
 .category-tab:hover { background:#3c3e32; }
 .category-tab[aria-selected='true']:hover { background:#f2c64c; }
 .tab-count { margin-left:7px; font-size:12px; opacity:.8; }
+.website-header { padding:13px 24px; border:1px solid var(--ink); border-bottom:0; background:var(--ink); color:white; font-size:14px; }
 .map-frame { border:2px solid var(--ink); background:white; }
 .map-canvas { position:relative; }
 #map { width:100%; height:480px; background:#e9ecdf; z-index:0; }
