@@ -1,7 +1,7 @@
 const categoryInfo = {
     ONLINE: 'Online',
     IN_PERSON: 'In person',
-    BOTH: 'Both',
+    BOTH: 'All',
 };
 const map = L.map('map');
 map.setView([43.4723, -80.5449], 14);
@@ -33,12 +33,22 @@ function showOfferLocations() {
 }
 document.getElementById('show-offers').addEventListener('click', showOfferLocations);
 
+const userLocationIcon = L.icon({
+    iconUrl: 'icons/user-location.svg',
+    className: 'user-location-dot',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    tooltipAnchor: [0, -12],
+});
+
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const { latitude, longitude, accuracy } = position.coords;
         if (userMarker) { map.removeLayer(userMarker); map.removeLayer(accuracyCircle); }
-        userMarker = L.marker([latitude, longitude]).addTo(map).bindTooltip(element('span', '', 'Your location'));
-        accuracyCircle = L.circle([latitude, longitude], { radius: accuracy, color: '#8d741e', fillOpacity: 0.06, weight: 1 }).addTo(map);
+        userMarker = L.marker([latitude, longitude], {
+            icon: userLocationIcon, title: 'Your location', alt: 'Your location', zIndexOffset: 1000,
+        }).addTo(map).bindTooltip(element('span', '', 'Your location'));
+        accuracyCircle = L.circle([latitude, longitude], { radius: accuracy, color: '#4285f4', fillOpacity: 0.06, weight: 1 }).addTo(map);
         if (!offersLoaded && !offerMarkers.length) map.fitBounds(accuracyCircle.getBounds());
     }, (error) => console.info('User location unavailable; student offers remain visible.', error.code));
 }
@@ -78,7 +88,7 @@ function focusPlace(place) {
     document.querySelector('.map-frame').scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
 }
 function renderDestination(offer, destination) {
-    if (selectedCategory === 'ONLINE') {
+    if (selectedCategory === 'ONLINE' || offer.classification?.category === 'ONLINE') {
         sourceLinks(offer, destination);
         return;
     }
@@ -178,9 +188,16 @@ function selectCategory(category) {
         tab.tabIndex = active ? 0 : -1;
     }
     document.getElementById('offers-panel').setAttribute('aria-labelledby', `tab-${category}`);
-    const offers = allOffers.filter((offer) => offer.classification?.category === category);
-    addPins(offers);
-    renderOfferList(offers);
+    if (category === 'BOTH') {
+        const physicalOffers = allOffers.filter((offer) => ['IN_PERSON', 'BOTH'].includes(offer.classification?.category));
+        const onlineOffers = allOffers.filter((offer) => ['ONLINE', 'BOTH'].includes(offer.classification?.category));
+        addPins(physicalOffers);
+        renderOfferList(onlineOffers);
+    } else {
+        const offers = allOffers.filter((offer) => offer.classification?.category === category);
+        addPins(offers);
+        renderOfferList(offers);
+    }
 }
 const tabs = [...document.querySelectorAll('[data-category]')];
 for (const tab of tabs) {
@@ -204,7 +221,11 @@ async function loadOffers() {
         const data = await response.json();
         if (!Array.isArray(data.offers)) throw new Error('Missing offers array');
         allOffers = data.offers;
-        for (const count of document.querySelectorAll('[data-count]')) count.textContent = allOffers.filter((offer) => offer.classification?.category === count.dataset.count).length;
+        for (const count of document.querySelectorAll('[data-count]')) {
+            count.textContent = allOffers.filter((offer) => count.dataset.count === 'BOTH'
+                ? Object.hasOwn(categoryInfo, offer.classification?.category)
+                : offer.classification?.category === count.dataset.count).length;
+        }
         offersLoaded = true;
         selectCategory(selectedCategory);
     } catch (error) {

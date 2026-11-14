@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#171815">
     <title>Offers</title>
+    <link rel="icon" type="image/svg+xml" href="icons/both.svg">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="leafletMap.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
@@ -17,9 +18,9 @@
     </div>
     <main class="page-shell" aria-label="Student offers">
         <div class="category-tabs" role="tablist" aria-label="Offer category">
-            <button id="tab-ONLINE" class="category-tab" role="tab" aria-selected="false" aria-controls="offers-panel" tabindex="-1" data-category="ONLINE">Online <span class="tab-count" data-count="ONLINE">—</span></button>
-            <button id="tab-IN_PERSON" class="category-tab" role="tab" aria-selected="true" aria-controls="offers-panel" tabindex="0" data-category="IN_PERSON">In person <span class="tab-count" data-count="IN_PERSON">—</span></button>
-            <button id="tab-BOTH" class="category-tab" role="tab" aria-selected="false" aria-controls="offers-panel" tabindex="-1" data-category="BOTH">Both <span class="tab-count" data-count="BOTH">—</span></button>
+            <button id="tab-ONLINE" class="category-tab" role="tab" aria-selected="false" aria-controls="offers-panel" tabindex="-1" data-category="ONLINE"><img class="category-icon" src="icons/online.svg" alt="" aria-hidden="true">Online <span class="tab-count" data-count="ONLINE">—</span></button>
+            <button id="tab-IN_PERSON" class="category-tab" role="tab" aria-selected="true" aria-controls="offers-panel" tabindex="0" data-category="IN_PERSON"><img class="category-icon" src="icons/in-person.svg" alt="" aria-hidden="true">In person <span class="tab-count" data-count="IN_PERSON">—</span></button>
+            <button id="tab-BOTH" class="category-tab" role="tab" aria-selected="false" aria-controls="offers-panel" tabindex="-1" data-category="BOTH">All <span class="tab-count" data-count="BOTH">—</span></button>
         </div>
         <div class="map-frame">
             <div class="map-canvas">

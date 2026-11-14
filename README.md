@@ -267,8 +267,12 @@ your WUSA cookies or Gemini key. Its requests use the
 [Nominatim search API](https://nominatim.org/release-docs/latest/api/Search/).
 
 The gold-and-black Leaflet page reads `Scraper/offers.json`. The Online, In person,
-and Both tabs filter the map and offer details together; In person is selected
-initially. Tabs support arrow keys, Home, and End. Online offers show their links
+and All tabs control the map and offer details; In person is selected initially.
+Online shows online-only offers, and In person shows in-person-only offers.
+All combines all physical offers on the map with all online-capable offers in
+the list below, including offers classified as `BOTH` in both areas. Its count
+is the number of unique offers across those two views. Tabs support arrow keys,
+Home, and End. Online offers show their links
 without physical map pins. Each offer row includes its description, expiry when
 provided, and addresses/poster/website links. The two-column layout stacks on
 phones. No additional Nominatim requests are made by switching tabs.
