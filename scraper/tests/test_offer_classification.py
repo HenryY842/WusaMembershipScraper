@@ -10,8 +10,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-import offer_classification as classification
-import Scraperpy as scraper
+from scraper import gemini_classifier as classification
+from scraper import wusa_scraper as scraper
 
 
 def result(category="IN_PERSON"):
@@ -30,10 +30,10 @@ class ClassificationTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.cache = self.root / "cache.json"
         self.offers = [{"title": "Coffee", "details": ["Redeem at the Student Life Centre counter."], "links": ["https://member.wusa.ca/reward?token=secret#code"]}]
-        reader_patch = patch("offer_sources.OfferSourceReader.collect", return_value={"sources": [], "media": [], "complete": True})
+        reader_patch = patch("scraper.offer_source_reader.OfferSourceReader.collect", return_value={"sources": [], "media": [], "complete": True})
         self.read_sources = reader_patch.start()
         self.addCleanup(reader_patch.stop)
-        geocode_patch = patch("offer_geocoding.geocode_offers", side_effect=lambda offers, *args, **kwargs: [{**offer, "geocoded_locations": []} for offer in offers])
+        geocode_patch = patch("scraper.location_finder.geocode_offers", side_effect=lambda offers, *args, **kwargs: [{**offer, "geocoded_locations": []} for offer in offers])
         self.geocode = geocode_patch.start()
         self.addCleanup(geocode_patch.stop)
 
@@ -265,7 +265,7 @@ class ClassificationTests(unittest.TestCase):
         with contextlib.redirect_stdout(expected):
             scraper.print_offers(scraper.parse_offers(html.read_text()))
         output = io.StringIO()
-        with patch.object(sys, "argv", ["Scraperpy.py", "--html", str(html)]), patch.object(classification, "classify_offers", side_effect=AssertionError("Should not classify")), patch.dict(sys.modules, {"google.genai": None}), contextlib.redirect_stdout(output):
+        with patch.object(sys, "argv", ["wusa_scraper.py", "--html", str(html)]), patch.object(classification, "classify_offers", side_effect=AssertionError("Should not classify")), patch.dict(sys.modules, {"google.genai": None}), contextlib.redirect_stdout(output):
             self.assertEqual(scraper.main(), 0)
         self.assertEqual(output.getvalue(), expected.getvalue())
 
@@ -274,7 +274,7 @@ class ClassificationTests(unittest.TestCase):
         html.write_text("<main><article><h3>Coffee</h3><p>20% off</p></article></main>", encoding="utf-8")
         output = self.root / "offers.json"
         client = fake_client()
-        with patch.object(sys, "argv", ["Scraperpy.py", "--html", str(html), "--classify", "--cache-file", str(self.cache), "--gemini-model", "test-model", "--output", str(output)]), patch.object(classification, "create_client", return_value=client), contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(sys, "argv", ["wusa_scraper.py", "--html", str(html), "--classify", "--cache-file", str(self.cache), "--gemini-model", "test-model", "--output", str(output)]), patch.object(classification, "create_client", return_value=client), contextlib.redirect_stdout(io.StringIO()):
             client.close = Mock()
             self.assertEqual(scraper.main(), 0)
         self.assertEqual(json.loads(output.read_text())["offers"][0]["classification"]["category"], "IN_PERSON")
@@ -287,7 +287,7 @@ class ClassificationTests(unittest.TestCase):
         output = self.root / "offers.json"
         client = fake_client()
         client.close = Mock()
-        args = ["Scraperpy.py", "--html", str(html), "--classify", "--cache-file", str(self.cache), "--gemini-model", "test-model"]
+        args = ["wusa_scraper.py", "--html", str(html), "--classify", "--cache-file", str(self.cache), "--gemini-model", "test-model"]
         with patch.object(sys, "argv", args), patch.object(scraper, "PROJECT_DIR", self.root), patch.object(classification, "create_client", return_value=client), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(scraper.main(), 0)
             first = json.loads(output.read_text(encoding="utf-8"))["offers"][0]

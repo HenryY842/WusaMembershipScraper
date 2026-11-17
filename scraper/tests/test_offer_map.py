@@ -66,7 +66,7 @@ class MapTests(unittest.TestCase):
         browser = shutil.which('msedge') or 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
         if not Path(browser).exists():
             self.skipTest('Microsoft Edge is not installed')
-        website = Path(__file__).resolve().parent.parent / 'Website'
+        website = Path(__file__).resolve().parents[2] / 'docs'
         matched = {'status': 'matched', 'lat': 43.47, 'lon': -80.52, 'display_name': 'Business address'}
         data = {'generated_at': '2026-11-06T05:00:00Z', 'offers': [
             {'title': '<img src=x onerror=alert(1)>', 'details': ['A student discount.', 'Expires: November 30, 2026'], 'links': ['https://example.com/poster.pdf'], 'classification': {'category': 'IN_PERSON'}, 'geocoded_locations': [matched]},
@@ -146,17 +146,17 @@ class MapTests(unittest.TestCase):
                 const output = document.createElement('pre'); output.id = 'qa-results'; output.textContent = JSON.stringify(report); document.body.append(output);
             }, 100);
         '''
-        soup = BeautifulSoup((website / 'MembershipMapWebsite.html').read_text(encoding='utf-8-sig'), 'html.parser')
+        soup = BeautifulSoup((website / 'index.html').read_text(encoding='utf-8-sig'), 'html.parser')
         for node in soup.select('script, link'):
             node.decompose()
         for icon in soup.select('.category-icon'):
             icon['src'] = (website / icon['src']).as_uri()
         style = soup.new_tag('style')
-        style.string = (website / 'leafletMap.css').read_text(encoding='utf-8-sig')
+        style.string = (website / 'style.css').read_text(encoding='utf-8-sig')
         soup.head.append(style)
         script = soup.new_tag('script')
         script.string = (stub + '\nwindow.fetch = async () => ({ok:true,json:async () => (' + json.dumps(data) + ')});\n'
-                         + (website / 'leafletMapScript.js').read_text(encoding='utf-8-sig') + checks)
+                         + (website / 'script.js').read_text(encoding='utf-8-sig') + checks)
         soup.body.append(script)
         for width in (1440, 390):
             with self.subTest(width=width), tempfile.TemporaryDirectory() as temp:

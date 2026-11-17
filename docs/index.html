@@ -7,16 +7,21 @@
     <title>Offers</title>
     <link rel="icon" type="image/svg+xml" href="icons/both.svg">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="leafletMap.css">
+    <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-    <script src="leafletMapScript.js" defer></script>
+    <script src="script.js" defer></script>
 </head>
 <body>
     <a class="skip-link" href="#offers-panel">Skip to offers</a>
-    <div class="website-header">
-        <head> Website Name </head>
-    </div>
     <main class="page-shell" aria-label="Student offers">
+        <div class="website-header">
+            <div class="data-controls" aria-label="Offer data source">
+                <button id="load-demo" class="data-button" type="button">Demo data</button>
+                <button id="choose-json" class="data-button" type="button">Import JSON</button>
+                <input id="offers-file" type="file" accept=".json,application/json" hidden>
+                <span id="data-source-status" class="data-source-status" role="status" aria-live="polite">Loading demo data...</span>
+            </div>
+        </div>
         <div class="category-tabs" role="tablist" aria-label="Offer category">
             <button id="tab-ONLINE" class="category-tab" role="tab" aria-selected="false" aria-controls="offers-panel" tabindex="-1" data-category="ONLINE"><img class="category-icon" src="icons/online.svg" alt="" aria-hidden="true">Online <span class="tab-count" data-count="ONLINE">—</span></button>
             <button id="tab-IN_PERSON" class="category-tab" role="tab" aria-selected="true" aria-controls="offers-panel" tabindex="0" data-category="IN_PERSON"><img class="category-icon" src="icons/in-person.svg" alt="" aria-hidden="true">In person <span class="tab-count" data-count="IN_PERSON">—</span></button>
@@ -24,7 +29,7 @@
         </div>
         <div class="map-frame">
             <div class="map-canvas">
-                <div id="map" data-offers-url="../Scraper/offers.json" aria-label="Map of offer locations"></div>
+                <div id="map" data-demo-url="demo-rewards.json" aria-label="Map of offer locations"></div>
                 <button id="show-offers" class="map-reset" type="button" disabled>Show all pins</button>
             </div>
             <p id="map-status" role="status" aria-live="polite">Loading offers…</p>

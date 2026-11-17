@@ -12,10 +12,12 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 
 OFFERS_URL = "https://member.wusa.ca/your_offers"
 OFFERS_API_URL = "https://member.wusa.ca/api/member_offers/your_offers"
 PROJECT_DIR = Path(__file__).resolve().parent
+load_dotenv(PROJECT_DIR.parent / ".env")
 
 def clean_headers(headers):
     #Let requests supply transport headers and request fresh HTML.
@@ -93,7 +95,7 @@ def check_login(html, url=OFFERS_URL):
     ):
         raise ValueError(
             "WUSA did not accept the session cookies (they may have expired). "
-            "Copy a fresh authenticated offers request into request.py or request.curl "
+            "Copy a fresh authenticated offers request into scraper/request.py or scraper/request.curl "
             "and run the scraper again."
         )
 
@@ -200,13 +202,12 @@ def get_offers(cookie=None, selector=None, headers=None, cookies=None):
         headers["Cookie"] = cookie
     if not headers.get("Cookie") and not cookies:
         raise ValueError(
-            "No session cookies configured. Save curl.trillworks Python output as "
-            "request.py beside this script, save Copy as cURL (bash) as request.curl, "
-            "or set WUSA_COOKIE. If you edited request.example.py, save it as request.py."
+            "No session cookies configured. Save Copy as cURL (bash) as "
+            "scraper/request.curl or set WUSA_COOKIE in the root .env file."
         )
     response = requests.get(OFFERS_API_URL, headers=headers, cookies=cookies or {}, timeout=30)
     if response.status_code in {401, 403}:
-        raise ValueError("WUSA rejected the session cookies. Copy a fresh authenticated request into request.py.")
+        raise ValueError("WUSA rejected the session cookies. Refresh scraper/request.curl or WUSA_COOKIE in .env.")
     response.raise_for_status()
     try:
         data = response.json()
@@ -243,7 +244,7 @@ def main():
     parser.add_argument("--geocode-country", default="ca", help="Nominatim country-code filter (default: ca)")
     parser.add_argument("--gemini-model", default=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"), help="Gemini model for classification")
     parser.add_argument("--cache-file", type=Path, default=PROJECT_DIR / ".classification_cache.json", help="Classification cache path")
-    parser.add_argument("--output", type=Path, help="JSON export path (defaults to Scraper/offers.json with --classify)")
+    parser.add_argument("--output", type=Path, help="JSON export path (defaults to scraper/offers.json with --classify)")
     args = parser.parse_args()
     geocode_enabled = args.geocode if args.geocode is not None else args.classify
     if args.refresh_links and (not args.classify or args.no_follow_links):
@@ -272,8 +273,8 @@ def main():
                 os.environ.get("WUSA_COOKIE"), args.selector, headers=headers, cookies=cookies
             )
         if args.classify:
-            from offer_classification import classify_offers
-            from offer_sources import OfferSourceReader
+            from .gemini_classifier import classify_offers
+            from .offer_source_reader import OfferSourceReader
             source_headers = requests.structures.CaseInsensitiveDict(headers)
             if os.environ.get("WUSA_COOKIE"):
                 source_headers["Cookie"] = os.environ["WUSA_COOKIE"]
@@ -284,14 +285,14 @@ def main():
                 refresh_links=args.refresh_links,
             )
         if geocode_enabled:
-            from offer_geocoding import geocode_offers
+            from .location_finder import geocode_offers
             offers = geocode_offers(offers, args.geocode_cache, region=args.geocode_region,
                                    countrycodes=args.geocode_country)
         output_path = args.output
         if (args.classify or geocode_enabled) and output_path is None:
             output_path = args.offers_file or PROJECT_DIR / "offers.json"
         if output_path is not None:
-            from offer_classification import export_offers
+            from .gemini_classifier import export_offers
             export_offers(offers, output_path)
         print_offers(offers)
         if args.classify:

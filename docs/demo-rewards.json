@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-01-01T00:00:00+00:00",
+  "offers": [
+    {
+      "title": "Demo Campus Cafe",
+      "details": ["Example offer for the map demo.", "Expires: December 31, 2026"],
+      "links": ["https://example.org/cafe"],
+      "classification": {
+        "category": "IN_PERSON",
+        "confidence": 1.0,
+        "reason": "Synthetic demo data.",
+        "locations": ["Demo Student Centre, Waterloo"],
+        "addresses": [],
+        "status": "ok"
+      },
+      "geocoded_locations": [
+        {
+          "address": "Demo Student Centre, Waterloo (sample location)",
+          "query": "Demo Student Centre, Waterloo",
+          "status": "matched",
+          "lat": 43.4723,
+          "lon": -80.5449,
+          "display_name": "Demo Student Centre, Waterloo, Ontario",
+          "precision": "building",
+          "address_details": {"building": "Demo Student Centre", "city": "Waterloo", "state": "Ontario"},
+          "provider": "demo"
+        }
+      ]
+    },
+    {
+      "title": "Demo Market",
+      "details": ["Example offer for the map demo."],
+      "links": ["https://example.org/market"],
+      "classification": {
+        "category": "IN_PERSON",
+        "confidence": 1.0,
+        "reason": "Synthetic demo data.",
+        "locations": ["Demo Market, Waterloo"],
+        "addresses": [],
+        "status": "ok"
+      },
+      "geocoded_locations": [
+        {
+          "address": "Demo Market, Waterloo (sample location)",
+          "query": "Demo Market, Waterloo",
+          "status": "matched",
+          "lat": 43.4742,
+          "lon": -80.5418,
+          "display_name": "Demo Market, Waterloo, Ontario",
+          "precision": "place",
+          "address_details": {"house_number": "12", "road": "Example Street", "city": "Waterloo", "state": "Ontario"},
+          "provider": "demo"
+        }
+      ]
+    },
+    {
+      "title": "Demo Online Store",
+      "details": ["Example offer redeemed online."],
+      "links": ["https://example.org/store"],
+      "classification": {
+        "category": "ONLINE",
+        "confidence": 1.0,
+        "reason": "Synthetic demo data.",
+        "locations": [],
+        "addresses": [],
+        "status": "ok"
+      },
+      "geocoded_locations": []
+    },
+    {
+      "title": "Demo Book Subscription",
+      "details": ["Example digital membership offer."],
+      "links": ["https://example.org/books"],
+      "classification": {
+        "category": "ONLINE",
+        "confidence": 1.0,
+        "reason": "Synthetic demo data.",
+        "locations": [],
+        "addresses": [],
+        "status": "ok"
+      },
+      "geocoded_locations": []
+    },
+    {
+      "title": "Demo Food Counter",
+      "details": ["Example offer available online and at a sample counter."],
+      "links": ["https://example.org/food"],
+      "classification": {
+        "category": "BOTH",
+        "confidence": 1.0,
+        "reason": "Synthetic demo data.",
+        "locations": ["Demo Food Court, Waterloo"],
+        "addresses": [],
+        "status": "ok"
+      },
+      "geocoded_locations": [
+        {
+          "address": "Demo Food Court, Waterloo (sample location)",
+          "query": "Demo Food Court, Waterloo",
+          "status": "matched",
+          "lat": 43.4723,
+          "lon": -80.5449,
+          "display_name": "Demo Food Court, Waterloo, Ontario",
+          "precision": "building",
+          "address_details": {"building": "Demo Student Centre", "city": "Waterloo", "state": "Ontario"},
+          "provider": "demo"
+        }
+      ]
+    }
+  ]
+}

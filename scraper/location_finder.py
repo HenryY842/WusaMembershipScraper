@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 import requests
 
-from offer_classification import addresses_from_locations, write_json
+from .gemini_classifier import addresses_from_locations, write_json
 
 DEFAULT_URL = "https://nominatim.openstreetmap.org/search"
 ATTRIBUTION = "© OpenStreetMap contributors, ODbL 1.0; geocoding by Nominatim"

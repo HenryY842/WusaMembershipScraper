@@ -10,9 +10,9 @@ from unittest.mock import MagicMock, Mock, patch
 
 import requests
 
-import offer_classification as classification
-import offer_geocoding as geo
-import Scraperpy as scraper
+from scraper import gemini_classifier as classification
+from scraper import location_finder as geo
+from scraper import wusa_scraper as scraper
 
 
 def offer(locations=None, addresses=None, category="IN_PERSON"):
@@ -161,7 +161,7 @@ class GeocodingTests(unittest.TestCase):
         value = offer(addresses=["35 University Ave E, Waterloo"])
         classification.export_offers([value], saved)
         output = geo.geocode_offers([value], self.cache, geocoder=Mock(lookup=Mock(return_value={"status": "not_found"})))
-        args = ["Scraperpy.py", "--offers-file", str(saved), "--geocode", "--geocode-cache", str(self.cache)]
+        args = ["wusa_scraper.py", "--offers-file", str(saved), "--geocode", "--geocode-cache", str(self.cache)]
         with patch.object(sys, "argv", args), patch.object(geo, "geocode_offers", return_value=output) as geocode, patch.object(scraper, "get_offers", side_effect=AssertionError("No scraping")), patch.object(classification, "create_client", side_effect=AssertionError("No Gemini")), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(scraper.main(), 0)
         self.assertEqual(json.loads(saved.read_text(encoding="utf-8"))["offers"][0]["geocoded_locations"][0]["status"], "not_found")
@@ -173,7 +173,7 @@ class GeocodingTests(unittest.TestCase):
         classification.export_offers([value], saved)
         places = [{"status": "matched", "lat": 43.47, "lon": -80.52, "display_name": "Business address"}]
         output = [{**value, "geocoded_locations": places}]
-        args = ["Scraperpy.py", "--offers-file", str(saved), "--classify"]
+        args = ["wusa_scraper.py", "--offers-file", str(saved), "--classify"]
         with patch.object(classification, "classify_offers", return_value=[value]), patch.object(geo, "geocode_offers", return_value=output) as geocode, contextlib.redirect_stdout(io.StringIO()):
             with patch.object(sys, "argv", args):
                 self.assertEqual(scraper.main(), 0)

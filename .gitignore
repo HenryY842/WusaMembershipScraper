@@ -1,6 +1,11 @@
 __pycache__/
+*.py[cod]
 request.py
 request.curl
 .classification_cache.json
 .geocoding_cache.json
 .env
+*.dpapi
+scraper/offers.json
+scraper/logs/
+state/offers.json

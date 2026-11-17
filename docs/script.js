@@ -3,6 +3,7 @@ const categoryInfo = {
     IN_PERSON: 'In person',
     BOTH: 'All',
 };
+const mapElement = document.getElementById('map');
 const map = L.map('map');
 map.setView([43.4723, -80.5449], 14);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -214,26 +215,58 @@ for (const tab of tabs) {
         selectCategory(tabs[index].dataset.category);
     });
 }
-async function loadOffers() {
+function validateOfferFile(data) {
+    if (!data || typeof data !== 'object' || !Array.isArray(data.offers)) {
+        throw new Error('The JSON file needs an offers array.');
+    }
+    if (data.offers.some((offer) => !offer || typeof offer !== 'object' || typeof offer.title !== 'string')) {
+        throw new Error('Each offer needs a title.');
+    }
+    return data.offers;
+}
+function showOffers(data, sourceLabel) {
+    allOffers = validateOfferFile(data);
+    for (const count of document.querySelectorAll('[data-count]')) {
+        count.textContent = allOffers.filter((offer) => count.dataset.count === 'BOTH'
+            ? Object.hasOwn(categoryInfo, offer.classification?.category)
+            : offer.classification?.category === count.dataset.count).length;
+    }
+    document.getElementById('data-source-status').textContent = sourceLabel;
+    offersLoaded = true;
+    selectCategory(selectedCategory);
+}
+async function loadDemo() {
     try {
-        const response = await fetch(document.getElementById('map').dataset.offersUrl, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`Offers HTTP ${response.status}`);
-        const data = await response.json();
-        if (!Array.isArray(data.offers)) throw new Error('Missing offers array');
-        allOffers = data.offers;
-        for (const count of document.querySelectorAll('[data-count]')) {
-            count.textContent = allOffers.filter((offer) => count.dataset.count === 'BOTH'
-                ? Object.hasOwn(categoryInfo, offer.classification?.category)
-                : offer.classification?.category === count.dataset.count).length;
-        }
-        offersLoaded = true;
-        selectCategory(selectedCategory);
+        const response = await fetch(mapElement.dataset.demoUrl, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Demo data HTTP ${response.status}`);
+        showOffers(await response.json(), 'Demo data');
     } catch (error) {
-        document.getElementById('map-status').textContent = 'Your offers could not be loaded. Please try again shortly.';
+        document.getElementById('map-status').textContent = 'Demo offers could not be loaded.';
+        document.getElementById('data-source-status').textContent = 'Could not load demo data';
         const empty = document.getElementById('offers-empty');
-        empty.textContent = location.protocol === 'file:' ? 'Open this page through the local web server so it can read your saved offers.' : 'We could not load the saved offers. Refresh the page to try again.';
+        empty.textContent = location.protocol === 'file:' ? 'Open this page through a local web server to load the demo file.' : 'Refresh the page to try again.';
         empty.hidden = false;
         console.error(error);
     }
 }
-loadOffers();
+async function importOffers(file) {
+    if (file.size > 20 * 1024 * 1024) {
+        document.getElementById('data-source-status').textContent = 'Import failed: choose a JSON file smaller than 20 MB.';
+        return;
+    }
+    try {
+        const data = JSON.parse(await file.text());
+        showOffers(data, `Imported ${file.name}`);
+    } catch (error) {
+        document.getElementById('data-source-status').textContent = `Import failed: ${error.message}`;
+    }
+}
+document.getElementById('load-demo').addEventListener('click', loadDemo);
+const fileInput = document.getElementById('offers-file');
+document.getElementById('choose-json').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+    const [file] = fileInput.files || [];
+    if (file) importOffers(file);
+    fileInput.value = '';
+});
+loadDemo();

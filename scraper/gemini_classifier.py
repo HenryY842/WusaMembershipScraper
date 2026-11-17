@@ -143,7 +143,7 @@ def create_client():
     try:
         from google import genai
     except ImportError as exc:
-        raise ValueError("Install Gemini support: python -m pip install -r requirements.txt") from exc
+        raise ValueError("Install Gemini support: python -m pip install -r scraper/requirements.txt") from exc
     return genai.Client(api_key=api_key, http_options={"timeout": 60000})
 
 
@@ -184,7 +184,7 @@ def classify_offers(offers, cache_path, model=DEFAULT_MODEL, client=None, *,
     owned_client = False
     unavailable = False
     if follow_links and source_reader is None:
-        from offer_sources import OfferSourceReader
+        from .offer_source_reader import OfferSourceReader
         source_reader = OfferSourceReader()
     completed = {}
     try:

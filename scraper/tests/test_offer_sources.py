@@ -2,8 +2,8 @@ import socket
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-import offer_sources as sources
-import Scraperpy as scraper
+from scraper import offer_source_reader as sources
+from scraper import wusa_scraper as scraper
 
 
 def response(status=200, mime="text/html", data=b"<p>Hello</p>", location=None):
