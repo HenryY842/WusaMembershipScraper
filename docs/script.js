@@ -239,7 +239,10 @@ async function loadDemo() {
     try {
         const response = await fetch(mapElement.dataset.demoUrl, { cache: 'no-store' });
         if (!response.ok) throw new Error(`Demo data HTTP ${response.status}`);
-        showOffers(await response.json(), 'Demo data');
+        const data = await response.json();
+        validateOfferFile(data);
+        selectedCategory = 'IN_PERSON';
+        showOffers(data, 'Demo data');
     } catch (error) {
         document.getElementById('map-status').textContent = 'Demo offers could not be loaded.';
         document.getElementById('data-source-status').textContent = 'Could not load demo data';
@@ -256,6 +259,8 @@ async function importOffers(file) {
     }
     try {
         const data = JSON.parse(await file.text());
+        validateOfferFile(data);
+        selectedCategory = 'BOTH';
         showOffers(data, `Imported ${file.name}`);
     } catch (error) {
         document.getElementById('data-source-status').textContent = `Import failed: ${error.message}`;

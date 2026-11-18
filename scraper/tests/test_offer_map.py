@@ -1,7 +1,8 @@
-"""Check category filtering, map interactions, and responsive layout in Edge."""
+"""Check category filtering, map interactions, and responsive layout in a Chromium browser."""
 import json
 from contextlib import contextmanager
 import itertools
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -63,7 +64,7 @@ def edge_page(browser, width, height):
 
 class MapTests(unittest.TestCase):
     def test_category_tabs_map_actions_links_and_responsive_layout(self):
-        browser = shutil.which('msedge') or 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+        browser = os.environ.get('WUSA_CHROMIUM_BROWSER') or shutil.which('msedge') or 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
         if not Path(browser).exists():
             self.skipTest('Microsoft Edge is not installed')
         website = Path(__file__).resolve().parents[2] / 'docs'
@@ -92,7 +93,7 @@ class MapTests(unittest.TestCase):
             };
         '''
         checks = '''
-            setTimeout(() => {
+            setTimeout(async () => {
                 const report = {};
                 const pins = () => window.visibleMarkers.filter(marker => marker.options.icon?.className === 'offer-count-pin');
                 const people = () => window.visibleMarkers.filter(marker => marker.options.icon?.className === 'user-location-dot');
@@ -143,6 +144,18 @@ class MapTests(unittest.TestCase):
                 report.tabCounts = [...document.querySelectorAll('[data-count]')].map(node => node.textContent);
                 report.noExtraSections = !document.querySelector('header, footer, aside, h1, h2');
                 report.categoryIconsLoaded = [...document.querySelectorAll('.category-icon')].length === 2 && [...document.querySelectorAll('.category-icon')].every(icon => icon.complete && icon.naturalWidth > 0);
+                const importedFile = new File([JSON.stringify({offers:[{title:'Local import', details:[], links:[], classification:{category:'ONLINE'}}]})], 'local.json', {type:'application/json'});
+                const transfer = new DataTransfer(); transfer.items.add(importedFile);
+                const input = document.getElementById('offers-file'); input.files = transfer.files;
+                input.dispatchEvent(new Event('change', {bubbles:true}));
+                await new Promise(resolve => setTimeout(resolve, 30));
+                report.importStatus = document.getElementById('data-source-status').textContent;
+                report.importAllSelected = document.getElementById('tab-BOTH').getAttribute('aria-selected');
+                report.importRows = document.querySelectorAll('.offer-row').length;
+                document.getElementById('load-demo').click();
+                await new Promise(resolve => setTimeout(resolve, 30));
+                report.demoRestored = document.getElementById('data-source-status').textContent === 'Demo data';
+                report.demoRowsRestored = document.querySelectorAll('.offer-row').length;
                 const output = document.createElement('pre'); output.id = 'qa-results'; output.textContent = JSON.stringify(report); document.body.append(output);
             }, 100);
         '''
@@ -214,6 +227,11 @@ class MapTests(unittest.TestCase):
                 self.assertTrue(report['noExtraSections'])
                 self.assertFalse(report['overflow'])
                 self.assertFalse(report['onlineOverflow'])
+                self.assertEqual(report['importStatus'], 'Imported local.json')
+                self.assertEqual(report['importAllSelected'], 'true')
+                self.assertEqual(report['importRows'], 1)
+                self.assertTrue(report['demoRestored'])
+                self.assertEqual(report['demoRowsRestored'], 3)
 
 if __name__ == '__main__':
     unittest.main()
