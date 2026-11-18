@@ -12,12 +12,10 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
 
 OFFERS_URL = "https://member.wusa.ca/your_offers"
 OFFERS_API_URL = "https://member.wusa.ca/api/member_offers/your_offers"
 PROJECT_DIR = Path(__file__).resolve().parent
-load_dotenv(PROJECT_DIR.parent / ".env")
 
 def clean_headers(headers):
     #Let requests supply transport headers and request fresh HTML.
@@ -28,11 +26,11 @@ def clean_headers(headers):
 )
 
 def load_python_request(path):
-    #Read curl.trillworks headers/cookies as literal data, without executing code.
+    #Read literal headers/cookies dictionaries as data; do not execute requests.py.
     try:
         tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     except SyntaxError as exc:
-        raise ValueError("The request file must contain valid Python from curl.trillworks.") from exc
+        raise ValueError("The request file must contain valid Python with literal headers and cookies dictionaries.") from exc
     data = {"headers": {}, "cookies": {}}
     for statement in tree.body:
         if not isinstance(statement, ast.Assign):
@@ -95,7 +93,7 @@ def check_login(html, url=OFFERS_URL):
     ):
         raise ValueError(
             "WUSA did not accept the session cookies (they may have expired). "
-            "Copy a fresh authenticated offers request into scraper/request.py or scraper/request.curl "
+            "Copy a fresh authenticated offers request into scraper/requests.py or scraper/request.curl "
             "and run the scraper again."
         )
 
@@ -202,12 +200,12 @@ def get_offers(cookie=None, selector=None, headers=None, cookies=None):
         headers["Cookie"] = cookie
     if not headers.get("Cookie") and not cookies:
         raise ValueError(
-            "No session cookies configured. Save Copy as cURL (bash) as "
-            "scraper/request.curl or set WUSA_COOKIE in the root .env file."
+            "No session cookies configured. Copy scraper/requests.example.py to "
+            "scraper/requests.py and add your WUSA request cookies."
         )
     response = requests.get(OFFERS_API_URL, headers=headers, cookies=cookies or {}, timeout=30)
     if response.status_code in {401, 403}:
-        raise ValueError("WUSA rejected the session cookies. Refresh scraper/request.curl or WUSA_COOKIE in .env.")
+        raise ValueError("WUSA rejected the session cookies. Refresh the cookies in scraper/requests.py.")
     response.raise_for_status()
     try:
         data = response.json()
@@ -229,7 +227,7 @@ def print_offers(offers):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group()
-    source.add_argument("--request-file", type=Path, help="Python output from curl.trillworks (reads headers/cookies only)")
+    source.add_argument("--request-file", type=Path, help="Private Python request file (reads literal headers/cookies dictionaries only)")
     source.add_argument("--curl-file", type=Path, help="Browser request copied as cURL (bash)")
     source.add_argument("--html", type=Path, help="Parse an already saved offers HTML file offline")
     source.add_argument("--offers-file", type=Path, help="Read exported offers JSON instead of scraping (can geocode without Gemini)")
@@ -265,19 +263,19 @@ def main():
                 headers, cookies = load_python_request(args.request_file)
             elif args.curl_file:
                 headers, cookies = load_curl_request(args.curl_file)
+            elif (PROJECT_DIR / "requests.py").is_file():
+                headers, cookies = load_python_request(PROJECT_DIR / "requests.py")
             elif (PROJECT_DIR / "request.py").is_file():
                 headers, cookies = load_python_request(PROJECT_DIR / "request.py")
             elif (PROJECT_DIR / "request.curl").is_file():
                 headers, cookies = load_curl_request(PROJECT_DIR / "request.curl")
             offers = get_offers(
-                os.environ.get("WUSA_COOKIE"), args.selector, headers=headers, cookies=cookies
+                None, args.selector, headers=headers, cookies=cookies
             )
         if args.classify:
             from .gemini_classifier import classify_offers
             from .offer_source_reader import OfferSourceReader
             source_headers = requests.structures.CaseInsensitiveDict(headers)
-            if os.environ.get("WUSA_COOKIE"):
-                source_headers["Cookie"] = os.environ["WUSA_COOKIE"]
             offers = classify_offers(
                 offers, args.cache_file, args.gemini_model,
                 follow_links=not args.no_follow_links,

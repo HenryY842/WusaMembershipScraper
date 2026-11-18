@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 request.py
+requests.py
 request.curl
 .classification_cache.json
 .geocoding_cache.json

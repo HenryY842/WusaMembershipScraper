@@ -30,61 +30,95 @@ your browser and is not uploaded. Choose **Demo data** to return to the sample.
 
 ## Use your own WUSA offers (optional)
 
-Only use this with an account and offers you are authorized to access. The demo
-works without cookies. WUSA cookies act like a temporary sign-in, so keep them
-private and never commit them or include them in a video or screenshot.
+Use the scraper only with an account and offers you are authorized to access.
+The demo map works without cookies or a Gemini key. WUSA cookies and Gemini
+keys are private sign-in details: never publish them, commit them, or show
+them in a video or screenshot.
 
-### Copy your signed-in request with cURL
+### Add your WUSA cookies
 
-These steps use Chrome. Other browsers have similar developer tools.
+1. Sign in to WUSA in Chrome and open your offers page.
+2. Press **F12** to open Developer Tools, choose **Network**, and reload the
+   offers page.
+3. Select the request for the offers list. Open **Headers** and find **Cookie**
+   under **Request Headers**. The cookie line contains pairs such as
+   `cookie_name=cookie_value; another_name=another_value`.
+4. In PowerShell, copy the starter to the private file the scraper reads:
 
-1. Sign in to WUSA in Chrome and open the offers page.
-2. Press **F12** (or right-click the page and choose **Inspect**) and open the
-   **Network** tab. Reload the offers page so the requests appear.
-3. Find the request for the offers list. Select it and confirm its address is
-   the WUSA offers API request. Right-click it and choose **Copy as cURL
-   (bash)**. Do not share the copied command; it contains your session.
-4. In the project folder, open or create `scraper/request.curl` in a text
-   editor. Paste the entire copied cURL command as Chrome copied it and save
-   the file. Keep any line breaks and backslashes.
-   Do not run the command in a terminal and do not paste it into `.env.example`.
-   The scraper reads the headers and cookies from this file as text, then makes
-   its own offers request.
-5. Install the Python packages if you have not already:
+       Copy-Item scraper/requests.example.py scraper/requests.py
+       notepad scraper/requests.py
+
+5. In `requests.py`, find this section:
+
+       cookies = {
+           # DELETE ME and paste your cookies here, as "cookie_name": "cookie_value",
+       }
+
+   Delete the `# DELETE ME...` comment. Add each cookie as a quoted name and
+   value separated by a colon, with a comma between pairs. For the example
+   Cookie line above, it would look like:
+
+       cookies = {
+           "cookie_name": "cookie_value",
+           "another_name": "another_value",
+       }
+
+   Use your own names and values from the WUSA request. Do not paste the whole
+   cURL command into this file. Cookies are private sign-in details; do not
+   show or share them.
+6. Install the Python packages:
 
        python -m pip install -r scraper/requirements.txt
 
-6. Run the scraper and save your offers locally:
+7. Run the scraper. Add `--classify` if you also set up a Gemini key:
 
        python -m scraper.wusa_scraper --classify --output scraper/offers.json
 
-7. On the website, choose **Import JSON** and select `scraper/offers.json`.
+8. On the website, choose **Import JSON** and select `scraper/offers.json`.
 
-The private `scraper/request.curl` file is ignored by Git. Check `git status`
-before sharing your project to make sure it is not listed as a file to commit.
-If WUSA rejects the request, your session may have expired: copy a fresh cURL
-request and replace the contents of `scraper/request.curl`.
+The scraper reads only the literal `headers` and `cookies` dictionaries in
+`requests.py`; it does not run the file as a program. `requests.py` is ignored
+by Git. Check `git status` before sharing your project to make sure your
+private file is not listed to commit. If WUSA rejects the request, your cookies
+may have expired; copy fresh ones into `requests.py`.
 
-### Cookie setting alternative
+### Get and use a Gemini API key (optional)
 
-If you already know how to copy the raw Cookie header, you can put just that
-value in `WUSA_COOKIE=` in your private root `.env` file. Do not include the
-cURL command, Python code, quotes, or the word `Cookie:`. The `.env.example`
-file is a blank template; leave it blank and do not commit your `.env` file.
-Create your private file with:
+You need a Gemini key only if you want the scraper to classify offers and read
+linked offer pages or posters. The demo map does not need a key.
 
-       if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+1. Open [Google AI Studio's API keys page](https://aistudio.google.com/apikey),
+   sign in, choose **Create API key**, and copy the key.
+2. Open this project folder in Visual Studio Code. Choose **Terminal**, then **New Terminal**. Make sure the terminal is using **PowerShell** and is open in the
+   project folder.
+3. Paste this command into the VS Code PowerShell terminal and press **Enter**:
 
-If you use this method, remove any old `scraper/request.curl` or
-`scraper/request.py` file so the scraper reads the cookie from `.env`.
+       $env:GEMINI_API_KEY = Read-Host "Paste your Gemini API key"
 
-### Optional Gemini classification
+4. When PowerShell asks for the key, paste it and press **Enter**. The key is
+   set only for this terminal window; do not include it in a screenshot or
+   recording.
+5. Start classification by pasting this command into the same terminal and
+   pressing **Enter**:
 
-Classification can use Gemini to read the offer and its linked page or poster
-to identify the redemption type and any stated location. Add your Gemini key
-to the private `.env` file as `GEMINI_API_KEY=your-key`, or use the Windows
-key setup script below. The demo website does not use this key. Never put a
-real key in `.env.example` or publish it.
+       python -m scraper.wusa_scraper --classify --output scraper/offers.json
+
+   Keep the terminal open while it runs. When it finishes, the classified offers
+   are saved in `scraper/offers.json`. If it says a package is missing, install
+   the packages with `python -m pip install -r scraper/requirements.txt` and run
+   the scraper command again.
+6. Open the map in your browser, choose **Import JSON**, and select
+   `scraper/offers.json`.
+7. When finished, remove the key from that PowerShell terminal:
+
+       Remove-Item Env:GEMINI_API_KEY
+
+Before running the scraper, set up your WUSA cookies as described above. For the
+optional monthly task, save the key encrypted for your Windows account and
+install the task from PowerShell:
+
+       powershell -ExecutionPolicy Bypass -File .\scraper\setup-gemini-key.ps1
+       powershell -ExecutionPolicy Bypass -File .\scraper\install-monthly-task.ps1
 
 ## How the offer pipeline works
 
@@ -99,9 +133,10 @@ Gemini.
 
 ## Optional monthly update on Windows
 
-After configuring WUSA access and saving your Gemini key, run this once:
+After copying your WUSA cookies into `scraper/requests.py` and saving your key
+with the encrypted setup script, run this once:
 
-    .\scraper\install-monthly-task.ps1
+    powershell -ExecutionPolicy Bypass -File .\scraper\install-monthly-task.ps1
 
 Windows will update your local offers file at 9:00 a.m. on the first day of
 each month while you are signed in. Check scraper/logs/ if an update fails.
@@ -111,8 +146,8 @@ WUSA cookies expire sometimes and may need to be replaced.
 
 - docs/ contains the website, sample offers, styles, and icons.
 - scraper/ contains the Python scraper and location tools.
-- .env.example is a blank settings template. Your private .env is not included
-  in the public project.
+- scraper/requests.example.py is the starter, with no real cookies, for your private
+  scraper/requests.py file.
 - scraper/offers.json is created on your computer and ignored by Git.
 
 GitHub Pages can host the demo from the docs folder; see

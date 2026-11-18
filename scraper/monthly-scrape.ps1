@@ -28,15 +28,14 @@ try {
                 [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer)
             }
         }
-        elseif (-not (Test-Path -LiteralPath (Join-Path $projectDir '.env') -PathType Leaf)) {
-            throw 'Gemini API key is not configured. Run scraper\setup-gemini-key.ps1 or create a private .env file from .env.example.'
+        else {
+            throw 'Gemini API key is not configured. Run scraper\setup-gemini-key.ps1 first.'
         }
     }
 
-    if (-not (Test-Path -LiteralPath (Join-Path $scraperDir 'request.py') -PathType Leaf) -and
-        -not (Test-Path -LiteralPath (Join-Path $scraperDir 'request.curl') -PathType Leaf) -and
-        -not $env:WUSA_COOKIE -and -not (Test-Path -LiteralPath (Join-Path $projectDir '.env') -PathType Leaf)) {
-        throw 'WUSA session cookies are not configured. Add scraper\request.py, scraper\request.curl, or set WUSA_COOKIE in .env.'
+    if (-not (Test-Path -LiteralPath (Join-Path $scraperDir 'requests.py') -PathType Leaf) -and
+        -not (Test-Path -LiteralPath (Join-Path $scraperDir 'request.py') -PathType Leaf)) {
+        throw 'WUSA session cookies are not configured. Copy scraper\requests.example.py to scraper\requests.py and add your cookies.'
     }
 
     $python = Get-Command python.exe -ErrorAction SilentlyContinue
