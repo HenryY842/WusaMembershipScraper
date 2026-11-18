@@ -8,11 +8,16 @@ A simple map for browsing student offers.
 It starts with made-up sample offers, so you can try it without signing in or
 connecting to WUSA.
 
-If you downloaded this project, open PowerShell in its folder and run:
+If you downloaded this project on Windows, double-click start-demo.bat in the
+top-level project folder. It starts the server in the correct folder for you.
+Leave the window open, then open http://localhost:8000/docs/ in your browser.
+Press Ctrl+C in the server window when you are done.
+
+Or, open PowerShell in the top-level project folder and run:
 
     python -m http.server 8000
 
-Then open http://localhost:8000/docs/ in your browser. Leave the PowerShell
+Then open http://localhost:8000/docs/ in your browser and leave the PowerShell
 window open while you use the page.
 
 Do not double-click docs/index.html or use GitHub's code preview; those do not
