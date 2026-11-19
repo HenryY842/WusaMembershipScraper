@@ -1,7 +1,11 @@
-"""Starter file for your private WUSA cookies. Copy this to requests.py."""
+'Replace everything from import requests once you copy the curl convertor to clipboard'
 
-headers = {}
+import requests
 
 cookies = {
-    # DELETE ME and paste your cookies here, as "cookie_name": "cookie_value",
+    # DELETE ME and paste your cookies here
+}
+
+headers = {
+    # DELETE ME and paste your headers here
 }

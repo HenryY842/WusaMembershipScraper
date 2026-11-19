@@ -1,6 +1,4 @@
-# WUSA Rewards Map
-
-A simple map for browsing student offers.
+# WUSA Membership Redesign
 
 ## Try the demo
 
@@ -9,7 +7,7 @@ It starts with made-up sample offers, so you can try it without signing in or
 connecting to WUSA.
 
 If you downloaded this project on Windows, double-click start-demo.bat in the
-top-level project folder. It starts the server in the correct folder for you.
+project folder. It starts the server in the correct folder for you.
 Leave the window open, then open http://localhost:8000/docs/ in your browser.
 Press Ctrl+C in the server window when you are done.
 
@@ -31,56 +29,51 @@ your browser and is not uploaded. Choose **Demo data** to return to the sample.
 ## Use your own WUSA offers (optional)
 
 Use the scraper only with an account and offers you are authorized to access.
-The demo map works without cookies or a Gemini key. WUSA cookies and Gemini
-keys are private sign-in details: never publish them, commit them, or show
-them in a video or screenshot.
+The demo map works without cookies or a Gemini key. You must use your own wusa membership 
+account and gemini key. Please do not share the details of your own program to others before
+deleting your cookies and gemini key as it both contains sensitive information!
 
 ### Add your WUSA cookies
 
 1. Sign in to WUSA in Chrome and open your offers page.
 2. Press **F12** to open Developer Tools, choose **Network**, and reload the
    offers page.
-3. Select the request for the offers list. Open **Headers** and find **Cookie**
-   under **Request Headers**. The cookie line contains pairs such as
-   `cookie_name=cookie_value; another_name=another_value`.
-4. In PowerShell, copy the starter to the private file the scraper reads:
+3. Find the WUSA offers request, right-click it, and choose **Copy as cURL
+   (bash)**.
+4. Open [curlconverter.com](https://curlconverter.com/), choose Python requests,
+   and paste the copied cURL command into the converter. Copy the complete
+   Python output it creates. That output contains your private WUSA cookies.
+5. Copy the safe starter to the private file the scraper reads, then open it:
 
        Copy-Item scraper/requests.example.py scraper/requests.py
        notepad scraper/requests.py
 
-5. In `requests.py`, find this section:
+6. Select and delete everything in `requests.py`. Paste the **whole Python
+   output** from curlconverter, including its `cookies = { ... }` and
+   `headers = { ... }` sections, then save the file. Do not paste the output
+   into `requests.example.py`.
 
-       cookies = {
-           # DELETE ME and paste your cookies here, as "cookie_name": "cookie_value",
-       }
+The starter shows the expected order with empty dictionaries:
 
-   Delete the `# DELETE ME...` comment. Add each cookie as a quoted name and
-   value separated by a colon, with a comma between pairs. For the example
-   Cookie line above, it would look like:
+    cookies = {
+        # DELETE ME and paste your cookies here
+    }
 
-       cookies = {
-           "cookie_name": "cookie_value",
-           "another_name": "another_value",
-       }
+    headers = {
+        # DELETE ME and paste your headers here
+    }
 
-   Use your own names and values from the WUSA request. Do not paste the whole
-   cURL command into this file. Cookies are private sign-in details; do not
-   show or share them.
-6. Install the Python packages:
+The scraper safely reads the literal `cookies` and `headers` dictionaries from
+`requests.py`; it does not run the converted request code. Keep the whole file
+private: cookies are temporary sign-in credentials. The file is ignored by
+Git. Check `git status` before sharing your project, and do not show the cURL
+command, converter output, or cookie values in a video or screenshot. If WUSA
+rejects the request, copy a fresh request and replace the contents of
+`requests.py`.
+
+After setting up cookies, install the Python packages:
 
        python -m pip install -r scraper/requirements.txt
-
-7. Run the scraper. Add `--classify` if you also set up a Gemini key:
-
-       python -m scraper.wusa_scraper --classify --output scraper/offers.json
-
-8. On the website, choose **Import JSON** and select `scraper/offers.json`.
-
-The scraper reads only the literal `headers` and `cookies` dictionaries in
-`requests.py`; it does not run the file as a program. `requests.py` is ignored
-by Git. Check `git status` before sharing your project to make sure your
-private file is not listed to commit. If WUSA rejects the request, your cookies
-may have expired; copy fresh ones into `requests.py`.
 
 ### Get and use a Gemini API key (optional)
 
