@@ -1,4 +1,6 @@
-'Replace everything from import requests once you copy the curl convertor to clipboard'
+# Replace this starter with the complete Python output from curlconverter.
+# The converted file should contain both cookies and headers dictionaries.
+# Never publish requests.py; it contains your WUSA session cookies.
 
 import requests
 
