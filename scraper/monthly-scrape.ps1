@@ -33,11 +33,6 @@ try {
         }
     }
 
-    if (-not (Test-Path -LiteralPath (Join-Path $scraperDir 'requests.py') -PathType Leaf) -and
-        -not (Test-Path -LiteralPath (Join-Path $scraperDir 'request.py') -PathType Leaf)) {
-        throw 'WUSA session cookies are not configured. Copy scraper\requests.example.py to scraper\requests.py and add your cookies.'
-    }
-
     $python = Get-Command python.exe -ErrorAction SilentlyContinue
     if (-not $python) {
         throw 'python.exe was not found in PATH for the scheduled task. Add Python to this Windows user PATH.'

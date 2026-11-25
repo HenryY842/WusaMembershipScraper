@@ -48,16 +48,10 @@ refresh or revoke it with the service that issued it.
    complete Python output it creates. The output contains your WUSA cookies, so
    treat it like a password. The converter says it processes the command in
    your browser, but never share the command or its output.
-5. In PowerShell, from the project folder, copy the starter file and open your
-   private copy:
-
-       Copy-Item scraper/requests.example.py scraper/requests.py
-       notepad scraper/requests.py
-
-6. Select and delete all the starter text in `requests.py`. Paste the **whole
-   Python output** from curlconverter, including the `cookies = {...}` and
-   `headers = {...}` dictionaries, then save the file. Do not paste it into
-   `requests.example.py`.
+5. Open `scraper/requests.example.py` in Visual Studio Code. Select and delete
+   its starter text, then paste the **whole Python output** from curlconverter,
+   including the `cookies = {...}` and `headers = {...}` dictionaries. Save
+   the file. The scraper reads cookies and headers directly from this file.
 
 The example file shows the expected dictionary order:
 
@@ -70,12 +64,14 @@ The example file shows the expected dictionary order:
     }
 
 The scraper reads the literal `cookies` and `headers` dictionaries from
-`requests.py`; it does not run the converted request code. Git ignores
-`requests.py`. Check `git status` before sharing the project and make sure the
-private file is not listed to commit. Do not show the cURL command, converter
-output, or cookie values in a video or screenshot. If WUSA rejects your request,
-your cookies may have expired; copy a fresh request and replace the contents of
-`requests.py`.
+`requests.example.py`; it does not run the converted request code. This is a
+tracked example file, so adding cookies to it changes a file in the project.
+Never commit or share the file while it contains cookies. Before publishing,
+restore the starter contents with `git restore -- scraper/requests.example.py`
+from a Git checkout, or download a fresh copy of the starter file. Do not show
+the cURL command, converter output, or cookie values in a video or screenshot.
+If WUSA rejects your request, your cookies may have expired; copy a fresh
+request and replace the contents of `requests.example.py`.
 
 After extracting the ZIP, check whether it created two nested project folders
 with the same name. If so, move the inner folder out of the outer folder (rename
@@ -142,7 +138,7 @@ Gemini.
 
 ## Optional monthly update on Windows
 
-After adding cookies to `scraper/requests.py` and saving your key with the
+After adding cookies to `scraper/requests.example.py` and saving your key with the
 encrypted setup script, install the scheduled task with:
 
     powershell -ExecutionPolicy Bypass -File .\scraper\install-monthly-task.ps1
@@ -155,8 +151,9 @@ cookies expire sometimes and may need to be replaced.
 
 - `docs/` contains the demo website, sample offers, styles, and icons.
 - `scraper/` contains the Python scraper and location tools.
-- `scraper/requests.example.py` is the safe starter for your private
-  `scraper/requests.py` file.
+- `scraper/requests.example.py` is where you paste your WUSA cookies and
+  request headers for local scraping. Restore its starter contents before
+  publishing or sharing the project.
 - `scraper/offers.json` is created on your computer and ignored by Git.
 
 GitHub Pages can publish the demo from the `docs` folder. See [GitHub's Pages

@@ -1,6 +1,6 @@
 # Replace this starter with the complete Python output from curlconverter.
 # The converted file should contain both cookies and headers dictionaries.
-# Never publish requests.py; it contains your WUSA session cookies.
+# This file is read directly by the scraper. Never publish it after adding cookies.
 
 import requests
 

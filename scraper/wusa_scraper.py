@@ -4,8 +4,6 @@ import json
 import ast
 import os
 from pathlib import Path
-import re
-import shlex
 import sys
 from typing import Literal
 from urllib.parse import urljoin, urlparse
@@ -26,7 +24,7 @@ def clean_headers(headers):
 )
 
 def load_python_request(path):
-    #Read literal headers/cookies dictionaries as data; do not execute requests.py.
+    # Read literal headers/cookies dictionaries as data; do not execute the file.
     try:
         tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     except SyntaxError as exc:
@@ -51,41 +49,6 @@ def load_python_request(path):
             data[target.id] = value
     return clean_headers(data["headers"]), data["cookies"]
 
-def load_curl_request(path):
-    #Read headers from 'Copy as cURL (bash)'; never run the command.
-    command = re.sub(r"\\\r?\n", " ", path.read_text(encoding="utf-8-sig"))
-    tokens = shlex.split(command)
-    if not tokens or tokens[0] not in {"curl", "curl.exe"}:
-        raise ValueError("The cURL file must start with curl. Use Copy as cURL (bash).")
-    headers = {}
-    index = 1
-    while index < len(tokens):
-        token = tokens[index]
-        option, separator, attached = token.partition("=")
-        if option in {"-H", "--header", "-b", "--cookie", "-X", "--request"}:
-            if separator:
-                value = attached
-            else:
-                index += 1
-                if index >= len(tokens):
-                    raise ValueError("A cURL header, cookie, or method is missing its value.")
-                value = tokens[index]
-            if option in {"-H", "--header"}:
-                name, colon, content = value.partition(":")
-                if not colon or not name.strip() or "\n" in value or "\r" in value:
-                    raise ValueError("Invalid cURL header. Copy the offers GET request again.")
-                headers[name.strip()] = content.strip()
-            elif option in {"-b", "--cookie"}:
-                if "=" not in value or "\n" in value or "\r" in value:
-                    raise ValueError("Use literal cookies from your copied browser request.")
-                headers["Cookie"] = value
-            elif value.upper() != "GET":
-                raise ValueError("Copy the GET request for the offers page.")
-        elif option.startswith("--data") or option in {"-d", "-F", "--form", "-I", "--head"}:
-            raise ValueError("Copy the GET request for the offers page.")
-        index += 1
-    return clean_headers(headers), {}
-
 def check_login(html, url=OFFERS_URL):
     soup = BeautifulSoup(html, "html.parser")
     if urlparse(url).path.rstrip("/") in {"/login", "/users/sign_in"} or soup.select_one(
@@ -93,8 +56,7 @@ def check_login(html, url=OFFERS_URL):
     ):
         raise ValueError(
             "WUSA did not accept the session cookies (they may have expired). "
-            "Copy a fresh authenticated offers request into scraper/requests.py or scraper/request.curl "
-            "and run the scraper again."
+            "Refresh the cookies in scraper/requests.example.py and run the scraper again."
         )
 
 def parse_offers(html, selector=None):
@@ -217,12 +179,12 @@ def get_offers(cookie=None, selector=None, headers=None, cookies=None):
         headers["Cookie"] = cookie
     if not headers.get("Cookie") and not cookies:
         raise ValueError(
-            "No session cookies configured. Copy scraper/requests.example.py to "
-            "scraper/requests.py and add your WUSA request cookies."
+            "No session cookies configured. Add your WUSA request cookies to "
+            "scraper/requests.example.py."
         )
     response = requests.get(OFFERS_API_URL, headers=headers, cookies=cookies or {}, timeout=30)
     if response.status_code in {401, 403}:
-        raise ValueError("WUSA rejected the session cookies. Refresh the cookies in scraper/requests.py.")
+        raise ValueError("WUSA rejected the session cookies. Refresh the cookies in scraper/requests.example.py.")
     response.raise_for_status()
     try:
         data = response.json()
@@ -244,8 +206,6 @@ def print_offers(offers):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group()
-    source.add_argument("--request-file", type=Path, help="Private Python request file (reads literal headers/cookies dictionaries only)")
-    source.add_argument("--curl-file", type=Path, help="Browser request copied as cURL (bash)")
     source.add_argument("--html", type=Path, help="Parse an already saved offers HTML file offline")
     source.add_argument("--offers-file", type=Path, help="Read exported offers JSON instead of scraping (can geocode without Gemini)")
     parser.add_argument("--selector", help="CSS selector for offer cards when parsing --html")
@@ -276,16 +236,7 @@ def main():
         elif args.html:
             offers = parse_offers(args.html.read_text(encoding="utf-8"), args.selector)
         else:
-            if args.request_file:
-                headers, cookies = load_python_request(args.request_file)
-            elif args.curl_file:
-                headers, cookies = load_curl_request(args.curl_file)
-            elif (PROJECT_DIR / "requests.py").is_file():
-                headers, cookies = load_python_request(PROJECT_DIR / "requests.py")
-            elif (PROJECT_DIR / "request.py").is_file():
-                headers, cookies = load_python_request(PROJECT_DIR / "request.py")
-            elif (PROJECT_DIR / "request.curl").is_file():
-                headers, cookies = load_curl_request(PROJECT_DIR / "request.curl")
+            headers, cookies = load_python_request(PROJECT_DIR / "requests.example.py")
             offers = get_offers(
                 None, args.selector, headers=headers, cookies=cookies
             )
