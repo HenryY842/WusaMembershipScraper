@@ -77,21 +77,15 @@ output, or cookie values in a video or screenshot. If WUSA rejects your request,
 your cookies may have expired; copy a fresh request and replace the contents of
 `requests.py`.
 
-Install the Python packages in PowerShell. First check where the terminal is:
+After extracting the ZIP, check whether it created two nested project folders
+with the same name. If so, move the inner folder out of the outer folder (rename
+it if Windows says that name is already in use). Open the folder that directly
+contains `README.md`, `docs/`, and `scraper/` in Visual Studio Code.
 
-    Get-Location
+In the VS Code PowerShell terminal, install the Python packages from that
+project folder:
 
-If the path ends in `WusaMembershipScraper`, run:
-
-    python -m pip install -r scraper/requirements.txt
-
-If the path ends in `WusaMembershipScraper\scraper`, run:
-
-    python -m pip install -r requirements.txt
-    Set-Location ..
-
-If you are in another folder, change to the project folder first. In VS Code,
-open the `WusaMembershipScraper` folder (not just `scraper`) using **File > Open Folder**, then open a new PowerShell terminal.
+    python -m pip install -r .\scraper\requirements.txt
 
 To create an offers file without Gemini classification, run:
 
