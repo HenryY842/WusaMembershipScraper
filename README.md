@@ -1,7 +1,5 @@
 # WUSA Rewards Map
 
-A simple map for browsing student offers.
-
 ## Try the demo
 
 The sample website uses made-up offers. You do not need WUSA cookies, a Gemini
