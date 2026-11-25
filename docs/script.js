@@ -118,6 +118,16 @@ function renderDestination(offer, destination) {
     }
     sourceLinks(offer, destination);
 }
+function offerClaimed(offer) {
+    if (typeof offer.claimed === 'boolean') return offer.claimed;
+    const claimedDetail = (Array.isArray(offer.details) ? offer.details : [])
+        .find((detail) => typeof detail === 'string' && /^Claimed:/i.test(detail));
+    if (!claimedDetail) return null;
+    const value = claimedDetail.replace(/^Claimed:\s*/i, '').trim().toLowerCase();
+    if (['yes', 'true', 'claimed', '1'].includes(value)) return true;
+    if (['no', 'false', 'unclaimed', '0'].includes(value)) return false;
+    return null;
+}
 function renderOfferList(offers) {
     const list = document.getElementById('offer-locations');
     list.replaceChildren();
@@ -127,10 +137,15 @@ function renderOfferList(offers) {
         const copy = element('div', 'offer-copy');
         const details = Array.isArray(offer.details) ? offer.details : [];
         copy.append(element('strong', 'offer-name', offer.title));
-        const description = details.filter((detail) => !/^(Category|Expires|Claimed):/.test(detail)).join(' ');
+        const description = details.filter((detail) => !/^(Category|Expires|Claimed):/i.test(detail)).join(' ');
         copy.append(element('p', 'offer-description', description || 'See the offer for full details and redemption instructions.'));
         const expiry = details.find((detail) => detail.startsWith('Expires:'));
         if (expiry) copy.append(element('p', 'offer-expiry', 'Until ' + expiry.replace(/^Expires:\s*/, '')));
+        const claimed = offerClaimed(offer);
+        if (claimed !== null) {
+            const label = claimed ? 'Already claimed' : 'Not claimed';
+            copy.append(element('p', `offer-claim-status ${claimed ? 'is-claimed' : 'is-available'}`, label));
+        }
         info.append(copy);
         const destination = element('div', 'offer-destination');
         renderDestination(offer, destination);
@@ -163,6 +178,10 @@ function addPins(offers) {
         for (const { offer, place } of entries) {
             const item = element('div', 'popup-item');
             item.append(element('strong', '', offer.title), element('p', '', place.address));
+            const claimed = offerClaimed(offer);
+            if (claimed !== null) {
+                item.append(element('p', `offer-claim-status ${claimed ? 'is-claimed' : 'is-available'}`, claimed ? 'Already claimed' : 'Not claimed'));
+            }
             if (place.precision === 'building') item.append(element('p', '', 'Building location; see the offer for the counter or floor.'));
             if (place.precision === 'address') item.append(element('p', '', 'Address location; the exact storefront has not been confirmed.'));
             popup.append(item);
@@ -191,9 +210,8 @@ function selectCategory(category) {
     document.getElementById('offers-panel').setAttribute('aria-labelledby', `tab-${category}`);
     if (category === 'BOTH') {
         const physicalOffers = allOffers.filter((offer) => ['IN_PERSON', 'BOTH'].includes(offer.classification?.category));
-        const onlineOffers = allOffers.filter((offer) => ['ONLINE', 'BOTH'].includes(offer.classification?.category));
         addPins(physicalOffers);
-        renderOfferList(onlineOffers);
+        renderOfferList(allOffers);
     } else {
         const offers = allOffers.filter((offer) => offer.classification?.category === category);
         addPins(offers);
@@ -227,9 +245,9 @@ function validateOfferFile(data) {
 function showOffers(data, sourceLabel) {
     allOffers = validateOfferFile(data);
     for (const count of document.querySelectorAll('[data-count]')) {
-        count.textContent = allOffers.filter((offer) => count.dataset.count === 'BOTH'
-            ? Object.hasOwn(categoryInfo, offer.classification?.category)
-            : offer.classification?.category === count.dataset.count).length;
+        count.textContent = count.dataset.count === 'BOTH'
+            ? allOffers.length
+            : allOffers.filter((offer) => offer.classification?.category === count.dataset.count).length;
     }
     document.getElementById('data-source-status').textContent = sourceLabel;
     offersLoaded = true;

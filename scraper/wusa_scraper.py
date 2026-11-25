@@ -156,6 +156,19 @@ def parse_offers(html, selector=None):
         )
     return offers
 
+def normalize_claimed(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        value = value.strip().lower()
+        if value in {"yes", "true", "claimed", "1"}:
+            return True
+        if value in {"no", "false", "unclaimed", "0"}:
+            return False
+    return None
+
 def parse_api_offers(data):
     #Normalize the JSON used by WUSA's JavaScript offers page.
     if not isinstance(data, dict) or data.get("success") is not True:
@@ -180,8 +193,9 @@ def parse_api_offers(data):
                 details.append(f"Category: {record['category_name']}")
             if record.get("expiration_date"):
                 details.append(f"Expires: {record['expiration_date']}")
-            if "claimed" in record:
-                details.append(f"Claimed: {'Yes' if record['claimed'] else 'No'}")
+            claimed = normalize_claimed(record.get("claimed")) if "claimed" in record else None
+            if claimed is not None:
+                details.append(f"Claimed: {'Yes' if claimed else 'No'}")
             urls = ([record.get("document_url")]
                     + [a.get("href") for a in description.select("a[href]")]
                     + [img.get("src") for img in description.select("img[src]")])
@@ -189,7 +203,10 @@ def parse_api_offers(data):
                 urljoin(OFFERS_URL, url) for url in urls
                 if isinstance(url, str) and url and urlparse(urljoin(OFFERS_URL, url)).scheme in {"http", "https"}
             ))
-            offers.append({"title": record["title"], "details": details, "links": links})
+            offer = {"title": record["title"], "details": details, "links": links}
+            if claimed is not None:
+                offer["claimed"] = claimed
+            offers.append(offer)
     return offers
 
 def get_offers(cookie=None, selector=None, headers=None, cookies=None):

@@ -38,6 +38,9 @@ button:disabled { cursor:default; opacity:.45; }
 .offer-name { display:block; font-size:17px; line-height:1.5; margin-bottom:8px; }
 .offer-description { font-size:14px; line-height:1.65; color:#53594a; margin:0; }
 .offer-expiry { margin:12px 0 0; color:#686f5d; font-size:12px; }
+.offer-claim-status { display:inline-block; margin:12px 0 0; padding:4px 9px; border-radius:999px; font-size:12px; font-weight:700; }
+.offer-claim-status.is-claimed { background:#eee7d4; color:#4d3b0d; }
+.offer-claim-status.is-available { background:#e6f2e8; color:#285432; }
 .offer-destination { padding:24px; border-left:1px solid #d8dbce; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:15px; background:#fdfdf8; }
 .destination-place { width:100%; }
 .address-line { margin:0 0 6px; font-size:14px; line-height:1.6; }

@@ -121,6 +121,20 @@ class SourceReaderTests(unittest.TestCase):
         }]})
         self.assertEqual(offers[0]["links"], ["https://example.com", "https://member.wusa.ca/poster.png"])
 
+    def test_claimed_state_is_preserved_as_a_boolean(self):
+        offers = scraper.parse_api_offers({"success": True, "offers": [
+            {"title": "Claimed", "claimed": True},
+            {"title": "Available", "claimed": False},
+            {"title": "String false", "claimed": "false"},
+            {"title": "Unknown", "claimed": "pending"},
+        ]})
+        self.assertIs(offers[0]["claimed"], True)
+        self.assertIs(offers[1]["claimed"], False)
+        self.assertIs(offers[2]["claimed"], False)
+        self.assertNotIn("claimed", offers[3])
+        self.assertIn("Claimed: Yes", offers[0]["details"])
+        self.assertIn("Claimed: No", offers[1]["details"])
+
 
 if __name__ == "__main__":
     unittest.main()

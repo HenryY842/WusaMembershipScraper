@@ -21,10 +21,13 @@ the map.
 Do not double-click `docs/index.html` or use GitHub's code preview; those do not
 run the demo page. You can also publish the `docs` folder with GitHub Pages.
 
-Choose **Online**, **In person**, or **All** to browse the sample. Choose
-**Import JSON** to select an offers file on your computer. Your browser reads
-the file locally; it is not uploaded. Choose **Demo data** to return to the
-sample.
+Choose **Online**, **In person**, or **All** to browse the sample. **All** puts
+every offer in the list and shows in-person offers on the map. If an imported
+offer includes a claimed value, the list and map popup show whether it is
+already claimed. Claim status reflects the imported file; scrape and import
+again after claiming or unclaiming an offer. Choose **Import JSON** to select
+an offers file on your computer. Your browser reads the file locally; it is
+not uploaded. Choose **Demo data** to return to the sample.
 
 ## Use your own WUSA offers (optional)
 
@@ -74,9 +77,21 @@ output, or cookie values in a video or screenshot. If WUSA rejects your request,
 your cookies may have expired; copy a fresh request and replace the contents of
 `requests.py`.
 
-Install the Python packages from the project folder:
+Install the Python packages in PowerShell. First check where the terminal is:
+
+    Get-Location
+
+If the path ends in `WusaMembershipScraper`, run:
 
     python -m pip install -r scraper/requirements.txt
+
+If the path ends in `WusaMembershipScraper\scraper`, run:
+
+    python -m pip install -r requirements.txt
+    Set-Location ..
+
+If you are in another folder, change to the project folder first. In VS Code,
+open the `WusaMembershipScraper` folder (not just `scraper`) using **File > Open Folder**, then open a new PowerShell terminal.
 
 To create an offers file without Gemini classification, run:
 

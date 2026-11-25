@@ -70,11 +70,12 @@ class MapTests(unittest.TestCase):
         website = Path(__file__).resolve().parents[2] / 'docs'
         matched = {'status': 'matched', 'lat': 43.47, 'lon': -80.52, 'display_name': 'Business address'}
         data = {'generated_at': '2026-11-06T05:00:00Z', 'offers': [
-            {'title': '<img src=x onerror=alert(1)>', 'details': ['A student discount.', 'Expires: November 30, 2026'], 'links': ['https://example.com/poster.pdf'], 'classification': {'category': 'IN_PERSON'}, 'geocoded_locations': [matched]},
+            {'title': '<img src=x onerror=alert(1)>', 'details': ['A student discount.', 'Expires: November 30, 2026'], 'claimed': False, 'links': ['https://example.com/poster.pdf'], 'classification': {'category': 'IN_PERSON'}, 'geocoded_locations': [matched]},
             {'title': 'Other offer, same building', 'classification': {'category': 'IN_PERSON'}, 'geocoded_locations': [matched]},
             {'title': 'Ambiguous', 'classification': {'category': 'IN_PERSON'}, 'geocoded_locations': [{'status': 'ambiguous', 'address': 'Unconfirmed address'}]},
-            {'title': 'Both offer', 'classification': {'category': 'BOTH'}, 'links': ['https://example.com/both'], 'geocoded_locations': [matched]},
+            {'title': 'Both offer', 'details': ['Claimed: Yes'], 'classification': {'category': 'BOTH'}, 'links': ['https://example.com/both'], 'geocoded_locations': [matched]},
             {'title': 'Online only', 'classification': {'category': 'ONLINE'}, 'links': ['https://example.com/discount', 'javascript:alert(1)'], 'geocoded_locations': [{**matched, 'lat': 40, 'lon': -70}]},
+            {'title': 'Not classified yet'},
         ]}
         stub = '''
             window.visibleMarkers = [];
@@ -102,6 +103,7 @@ class MapTests(unittest.TestCase):
                 report.initialPins = pins().length;
                 report.badge = pins()[0].options.icon.html;
                 report.popupAddress = pins()[0].popup.textContent.includes('Business address');
+                report.mapClaimStatus = pins()[0].popup.textContent.includes('Not claimed');
                 report.expiryVisible = document.querySelector('.offer-expiry').textContent;
                 report.safeTitle = document.querySelector('.offer-name').textContent;
                 report.noInjectedImages = document.querySelectorAll('.offer-list img').length === 0;
@@ -132,12 +134,13 @@ class MapTests(unittest.TestCase):
                 report.bothRows = document.querySelectorAll('.offer-row').length;
                 report.bothTitle = document.querySelector('.offer-name').textContent;
                 report.bothTitles = [...document.querySelectorAll('.offer-name')].map(node => node.textContent);
+                report.claimStatuses = [...document.querySelectorAll('.offer-claim-status')].map(node => node.textContent);
                 report.bothPins = pins().length;
                 report.bothBadge = pins()[0].options.icon.html;
                 report.bothPopup = pins()[0].popup.textContent;
                 report.bothStatus = document.getElementById('map-status').textContent;
                 report.bothOnlineLinks = [...document.querySelectorAll('.source-link')].map(link => link.href);
-                report.bothOnlineMapLinks = document.querySelectorAll('.offer-row')[1].querySelectorAll('.map-link').length;
+                report.firstOfferMapLinks = document.querySelectorAll('.offer-row')[0].querySelectorAll('.map-link').length;
                 report.panelLabel = document.getElementById('offers-panel').getAttribute('aria-labelledby');
                 document.getElementById('tab-IN_PERSON').click();
                 report.overflow = document.documentElement.scrollWidth > window.innerWidth;
@@ -191,6 +194,7 @@ class MapTests(unittest.TestCase):
                 self.assertIn('2/3 offers mapped across 1 location.', report['initialStatus'])
                 self.assertIn('<b>2</b>', report['badge'])
                 self.assertTrue(report['popupAddress'])
+                self.assertTrue(report['mapClaimStatus'])
                 self.assertEqual(report['safeTitle'], '<img src=x onerror=alert(1)>')
                 self.assertTrue(report['noInjectedImages'])
                 self.assertIn('November 30, 2026', report['expiryVisible'])
@@ -211,19 +215,20 @@ class MapTests(unittest.TestCase):
                 self.assertEqual(report['onlineLinks'][0]['href'], 'https://example.com/discount')
                 self.assertIn('noopener', report['onlineLinks'][0]['rel'])
                 self.assertEqual(report['bothSelected'], 'true')
-                self.assertEqual(report['bothRows'], 2)
-                self.assertEqual(report['bothTitle'], 'Both offer')
-                self.assertEqual(report['bothTitles'], ['Both offer', 'Online only'])
+                self.assertEqual(report['bothRows'], 6)
+                self.assertEqual(report['bothTitle'], '<img src=x onerror=alert(1)>')
+                self.assertEqual(report['bothTitles'], ['<img src=x onerror=alert(1)>', 'Other offer, same building', 'Ambiguous', 'Both offer', 'Online only', 'Not classified yet'])
+                self.assertEqual(report['claimStatuses'], ['Not claimed', 'Already claimed'])
                 self.assertEqual(report['bothPins'], 1)
                 self.assertIn('<b>3</b>', report['bothBadge'])
                 self.assertIn('Other offer, same building', report['bothPopup'])
                 self.assertIn('Both offer', report['bothPopup'])
                 self.assertNotIn('Online only', report['bothPopup'])
                 self.assertIn('3/4 offers mapped across 1 location.', report['bothStatus'])
-                self.assertEqual(report['bothOnlineLinks'], ['https://example.com/both', 'https://example.com/discount'])
-                self.assertEqual(report['bothOnlineMapLinks'], 0)
+                self.assertEqual(report['bothOnlineLinks'], ['https://example.com/poster.pdf', 'https://example.com/both', 'https://example.com/discount'])
+                self.assertEqual(report['firstOfferMapLinks'], 1)
                 self.assertEqual(report['panelLabel'], 'tab-BOTH')
-                self.assertEqual(report['tabCounts'], ['1', '3', '5'])
+                self.assertEqual(report['tabCounts'], ['1', '3', '6'])
                 self.assertTrue(report['noExtraSections'])
                 self.assertFalse(report['overflow'])
                 self.assertFalse(report['onlineOverflow'])
